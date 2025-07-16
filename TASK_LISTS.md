@@ -4,8 +4,8 @@
 
 ### 1.1 API Service Layer Setup
 
-- [ ] **Create service layer structure**
-  - [ ] Create `src/services/` directory
+- [x] **Create service layer structure**
+  - [x] Create `src/services/` directory
 ├── services/
 │   ├── auth.service.js        // Authentication services
 │   ├── users.service.js       // User management services
