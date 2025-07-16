@@ -68,6 +68,10 @@ export default function MessagesPage() {
       url: "/files/career-opportunities-cs.docx",
       uploadedAt: "2024-06-18T14:30:00Z",
       uploadedBy: "Prof. Ahmad Hassan",
+      sharedWith: ["Ahmad Ali"],
+      description: "Career opportunities in Computer Science field",
+    },
+  ]);
 
   // Mock messages data
   const [messages] = useState([
@@ -105,7 +109,7 @@ export default function MessagesPage() {
       content: "Here's the academic planning guide I mentioned:",
       timestamp: "2024-06-20T15:02:00Z",
       isRead: true,
-      attachment: mockAttachment,
+      attachment: sharedResources[0],
     },
     {
       id: "5",
