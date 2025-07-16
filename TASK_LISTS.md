@@ -3,16 +3,22 @@
 ## Phase 1: Service Layer Setup & Foundation
 
 ### 1.1 API Service Layer Setup
-- [ ] **Keep existing axios configuration**
-  - [ ] Keep `src/lib/axiosInstance.js` in current location
-  - [ ] Enhance error handling in interceptors if needed
-  - [ ] Add request/response logging for development
 
 - [ ] **Create service layer structure**
   - [ ] Create `src/services/` directory
-  - [ ] Create base service utilities
-  - [ ] Set up service layer constants
-  - [ ] Create query key factory for React Query
+│   ├── auth.service.js         // Authentication services
+│   ├── users.service.js        // User management services
+│   ├── appointments.service.js // Appointment services
+│   ├── messages.service.js     // Messaging services
+│   ├── notes.service.js        // Student notes services
+│   ├── dashboard.service.js    // Dashboard/analytics services
+│   ├── upload.service.js       // File upload services (single file)
+│   ├── bus.service.js          // Bus management API calls
+│   ├── schedule.service.js     // Schedule management API calls
+│   ├── booking.service.js      // Booking management API calls
+│   ├── search.service.js       // Search functionality API calls
+│   └── analytics.service.js    // Analytics API calls
+
 
 ### 1.2 Authentication Services
 - [ ] **Create auth.service.js**
