@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { MessageCircle, FolderOpen } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import { toast } from "sonner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ConversationList from "@/components/messages/ConversationList";
 import ChatWindow from "@/components/messages/ChatWindow";
-import ResourcesPanel from "@/components/messages/ResourcesPanel";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function MessagesPage() {
@@ -13,7 +11,6 @@ export default function MessagesPage() {
   const currentUserId = "1"; // Mock current user ID
   const { user } = useAuth();
   const userRole = user?.role;
-  const [activeTab, setActiveTab] = useState("messages");
 
   // Mock users data
   const users = [
@@ -47,31 +44,15 @@ export default function MessagesPage() {
     },
   ];
 
-  // Mock shared resources data
-  const [sharedResources] = useState([
-    {
-      id: "1",
-      name: "Academic_Planning_Guide_2024.pdf",
-      size: "2.1 MB",
-      type: "application/pdf",
-      url: "/files/academic-planning-guide.pdf",
-      uploadedAt: "2024-06-20T15:02:00Z",
-      uploadedBy: "Dr. Sarah Ahmed",
-      sharedWith: ["Ahmad Ali"],
-      description: "Comprehensive guide for academic planning and course selection",
-    },
-    {
-      id: "2",
-      name: "Career_Opportunities_CS_2024.docx",
-      size: "1.8 MB",
-      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      url: "/files/career-opportunities-cs.docx",
-      uploadedAt: "2024-06-18T14:30:00Z",
-      uploadedBy: "Prof. Ahmad Hassan",
-      sharedWith: ["Ahmad Ali"],
-      description: "Career opportunities in Computer Science field",
-    },
-  ]);
+  // Mock file attachment
+  const mockAttachment = {
+    id: "1",
+    name: "Academic_Planning_Guide_2024.pdf",
+    size: "2.1 MB",
+    type: "application/pdf",
+    url: "/files/academic-planning-guide.pdf",
+    uploadedAt: "2024-06-20T15:02:00Z",
+  };
 
   // Mock messages data
   const [messages] = useState([
@@ -109,7 +90,7 @@ export default function MessagesPage() {
       content: "Here's the academic planning guide I mentioned:",
       timestamp: "2024-06-20T15:02:00Z",
       isRead: true,
-      attachment: sharedResources[0],
+      attachment: mockAttachment,
     },
     {
       id: "5",

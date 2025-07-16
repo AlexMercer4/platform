@@ -1,30 +1,92 @@
-import {
-  Users,
-  UserCheck,
-  Calendar,
-  BarChart3,
-  TrendingUp,
-  Clock,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import StatsCard from "@/components/dashboard/StatsCard";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+import { MessageCircle, FolderOpen } from "lucide-react";
+import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ConversationList from "@/components/messages/ConversationList";
+import ChatWindow from "@/components/messages/ChatWindow";
+import ResourcesPanel from "@/components/messages/ResourcesPanel";
+import { useAuth } from "@/contexts/AuthContext";
 
-export default function ChairpersonDashboard() {
-  // Mock departmental statistics
-  const departmentStats = [
+export default function MessagesPage() {
+  const [searchParams] = useSearchParams();
+  const currentUserId = "1"; // Mock current user ID
+  const { user } = useAuth();
+  const userRole = user?.role;
+  const [activeTab, setActiveTab] = useState("messages");
+
+  // Mock users data
+  const users = [
     {
-      title: "Total Students",
-      value: "342",
-      subtitle: "Computer Science Dept.",
+      id: "1",
+      name: "Ahmad Ali",
+      email: "ahmad.ali@student.edu",
+      role: "student",
+      isOnline: true,
+    },
+    {
+      id: "2",
+      name: "Dr. Sarah Ahmed",
+      email: "sarah@university.edu",
+      role: "counselor",
+      isOnline: true,
+    },
+    {
+      id: "3",
+      name: "Prof. Ahmad Hassan",
+      email: "ahmad@university.edu",
+      role: "counselor",
+      isOnline: false,
+    },
+    {
+      id: "4",
+      name: "Dr. Fatima Sheikh",
+      email: "fatima@university.edu",
+      role: "counselor",
+      isOnline: true,
+    },
+  ];
+
+  if (statsLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0056b3]"></div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Mock shared resources data
+  const [sharedResources] = useState([
+    {
+      id: "1",
+      name: "Academic_Planning_Guide_2024.pdf",
+      size: "2.1 MB",
+      type: "application/pdf",
+      url: "/files/academic-planning-guide.pdf",
+      uploadedAt: "2024-06-20T15:02:00Z",
+      uploadedBy: "Dr. Sarah Ahmed",
+      sharedWith: ["Ahmad Ali"],
+      description: "Comprehensive guide for academic planning and course selection",
+    },
+    {
+      id: "2",
+      name: "Career_Opportunities_CS_2024.docx",
+      size: "1.8 MB",
+      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      url: "/files/career-opportunities-cs.docx",
+      uploadedAt: "2024-06-18T14:30:00Z",
+      uploadedBy: "Prof. Ahmad Hassan",
       icon: Users,
       borderColor: "border-l-blue-500",
       iconBgColor: "bg-blue-500",
     },
     {
       title: "Active Counselors",
-      value: "8",
+      value: dashboardStats.activeCounselors?.toString() || "0",
       subtitle: "Currently assigned",
       icon: UserCheck,
       borderColor: "border-l-green-500",
@@ -32,7 +94,7 @@ export default function ChairpersonDashboard() {
     },
     {
       title: "Monthly Appointments",
-      value: "156",
+      value: dashboardStats.monthlyAppointments?.toString() || "0",
       subtitle: "This month",
       icon: Calendar,
       borderColor: "border-l-purple-500",
@@ -40,115 +102,212 @@ export default function ChairpersonDashboard() {
     },
     {
       title: "Avg. Response Time",
-      value: "2.4h",
+      value: dashboardStats.avgResponseTime || "0h",
       subtitle: "Counselor response",
       icon: Clock,
       borderColor: "border-l-orange-500",
       iconBgColor: "bg-orange-500",
     },
-  ];
+  ] : [];
 
-  // Mock counselor performance data
-  const counselorPerformance = [
+  // Mock messages data
+  const [messages] = useState([
     {
       id: "1",
-      name: "Dr. Sarah Ahmed",
-      specialization: "Academic Counseling",
-      studentsAssigned: 45,
-      appointmentsThisMonth: 28,
-      avgSessionDuration: "42 min",
-      responseRate: "98%",
-      status: "active",
+      senderId: "2",
+      receiverId: "1",
+      content:
+        "Hi Ahmad! I hope you're doing well. Just a reminder about our meeting tomorrow at 10 AM.",
+      timestamp: "2024-06-20T14:30:00Z",
+      isRead: true,
     },
     {
       id: "2",
-      name: "Prof. Ahmad Hassan",
-      specialization: "Career Guidance",
-      studentsAssigned: 38,
-      appointmentsThisMonth: 22,
-      avgSessionDuration: "38 min",
-      responseRate: "95%",
-      status: "active",
+      senderId: "1",
+      receiverId: "2",
+      content:
+        "Hello Dr. Ahmed! Yes, I'll be there. Should I bring anything specific?",
+      timestamp: "2024-06-20T14:45:00Z",
+      isRead: true,
     },
     {
       id: "3",
-      name: "Dr. Fatima Sheikh",
-      specialization: "Personal Development",
-      studentsAssigned: 41,
-      appointmentsThisMonth: 31,
-      avgSessionDuration: "45 min",
-      responseRate: "97%",
-      status: "active",
+      senderId: "2",
+      receiverId: "1",
+      content:
+        "Please bring your academic transcript and any questions about your course selection for next semester.",
+      timestamp: "2024-06-20T15:00:00Z",
+      isRead: true,
     },
     {
       id: "4",
-      name: "Dr. Ali Khan",
-      specialization: "Academic Planning",
-      studentsAssigned: 35,
-      appointmentsThisMonth: 18,
-      avgSessionDuration: "40 min",
-      responseRate: "92%",
-      status: "on_leave",
+      senderId: "2",
+      receiverId: "1",
+      content: "Here's the academic planning guide I mentioned:",
+      timestamp: "2024-06-20T15:02:00Z",
+      isRead: true,
+      attachment: mockAttachment,
     },
-  ];
+    {
+      id: "5",
+      senderId: "1",
+      receiverId: "2",
+      content: "Perfect! I have both ready. See you tomorrow!",
+      timestamp: "2024-06-20T15:05:00Z",
+      isRead: true,
+    },
+  ]);
 
-  // Mock recent activities
-  const recentActivities = [
+  // Mock conversations data
+  const [conversations, setConversations] = useState([
     {
       id: "1",
-      type: "assignment",
-      description: "Assigned 5 new students to Dr. Sarah Ahmed",
-      timestamp: "2 hours ago",
-      priority: "normal",
+      participants: [users[0], users[1]], // Ahmad Ali & Dr. Sarah Ahmed
+      lastMessage: messages[4],
+      unreadCount: 0,
+      updatedAt: "2024-06-20T15:05:00Z",
     },
     {
       id: "2",
-      type: "counselor_added",
-      description: "Added new counselor: Dr. Zara Malik",
-      timestamp: "1 day ago",
-      priority: "normal",
+      participants: [users[0], users[2]], // Ahmad Ali & Prof. Ahmad Hassan
+      lastMessage: {
+        id: "6",
+        senderId: "3",
+        receiverId: "1",
+        content:
+          "I have approved your course selection. Check the resources section for additional materials.",
+        timestamp: "2024-06-19T10:00:00Z",
+        isRead: false,
+      },
+      unreadCount: 1,
+      updatedAt: "2024-06-19T10:00:00Z",
     },
     {
       id: "3",
-      type: "report_generated",
-      description: "Monthly department report generated",
-      timestamp: "2 days ago",
-      priority: "low",
+      participants: [users[0], users[3]], // Ahmad Ali & Dr. Fatima Sheikh
+      lastMessage: {
+        id: "7",
+        senderId: "4",
+        receiverId: "1",
+        content:
+          "Thank you for the session today. Here are the action items we discussed...",
+        timestamp: "2024-06-17T16:30:00Z",
+        isRead: false,
+      },
+      unreadCount: 1,
+      updatedAt: "2024-06-17T16:30:00Z",
     },
-    {
-      id: "4",
-      type: "policy_update",
-      description: "Updated counseling session duration policy",
-      timestamp: "3 days ago",
-      priority: "high",
-    },
-  ];
+  ]);
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800";
-      case "on_leave":
-        return "bg-yellow-100 text-yellow-800";
-      case "inactive":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
+  const [activeConversationId, setActiveConversationId] = useState("1");
+
+  // Check for userId in URL params and start conversation if needed
+  useEffect(() => {
+    const userId = searchParams.get("userId");
+    if (userId) {
+      handleStartConversation(userId);
+    }
+  }, [searchParams]);
+
+  const activeConversation = conversations.find(
+    (c) => c.id === activeConversationId
+  );
+  const conversationMessages = activeConversationId
+    ? messages.filter(
+        (m) =>
+          (m.senderId === currentUserId &&
+            m.receiverId ===
+              activeConversation?.participants.find(
+                (p) => p.id !== currentUserId
+              )?.id) ||
+          (m.receiverId === currentUserId &&
+            m.senderId ===
+              activeConversation?.participants.find(
+                (p) => p.id !== currentUserId
+              )?.id)
+      )
+    : [];
+
+  const handleSendMessage = (content, file) => {
+    if (!activeConversationId) return;
+
+    // In a real app, this would send the message to the server
+    console.log("Sending message:", {
+      content,
+      file,
+      conversationId: activeConversationId,
+    });
+
+    // Mock success feedback
+    if (file) {
+      console.log("File attached:", file.name);
     }
   };
 
-  const getActivityColor = (priority) => {
-    switch (priority) {
-      case "high":
-        return "border-l-red-500";
-      case "normal":
-        return "border-l-blue-500";
-      case "low":
-        return "border-l-gray-500";
-      default:
-        return "border-l-gray-500";
+  const handleStartConversation = async (userId) => {
+    try {
+      // Find the user to start conversation with
+      const targetUser = [...users].find((u) => u.id === userId);
+      if (!targetUser) {
+        toast.error("User not found");
+        return;
+      }
+
+      // Check if conversation already exists
+      const existingConversation = conversations.find((conv) =>
+        conv.participants.some((p) => p.id === userId)
+      );
+
+      if (existingConversation) {
+        setActiveConversationId(existingConversation.id);
+        toast.info(`Opened conversation with ${targetUser.name}`);
+        return;
+      }
+
+      // Create new conversation
+      const newConversation = {
+        id: Date.now().toString(),
+        participants: [users.find((u) => u.id === currentUserId), targetUser],
+        lastMessage: {
+          id: Date.now().toString(),
+          senderId: currentUserId,
+          receiverId: userId,
+          content: "Conversation started",
+          timestamp: new Date().toISOString(),
+          isRead: false,
+        },
+        unreadCount: 0,
+        updatedAt: new Date().toISOString(),
+      };
+
+      setConversations((prev) => [newConversation, ...prev]);
+      setActiveConversationId(newConversation.id);
+      toast.success(`Started conversation with ${targetUser.name}`);
+    } catch (error) {
+      toast.error("Failed to start conversation");
+      throw error;
     }
   };
+
+  // Check if user can access messaging
+  if (userRole === "chairperson") {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="text-center py-12">
+            <MessageCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              Messages Not Available
+            </h2>
+            <p className="text-gray-600">
+              Chairpersons do not have access to direct messaging. Please use
+              the reporting and analytics features instead.
+            </p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -156,196 +315,48 @@ export default function ChairpersonDashboard() {
         {/* Header Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">
-            Chairperson Dashboard
+            Messages & Resources
           </h1>
           <p className="text-gray-600 mt-2">
-            Welcome back, Prof. Ahmad Hassan! Monitor and manage your
-            department&apos;s counseling activities.
+            Communicate with your{" "}
+            {userRole === "student" ? "counselors" : "students"} and share
+            resources in real-time.
           </p>
         </div>
 
-        {/* Department Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {departmentStats.map((stat, index) => (
-            <StatsCard
-              key={index}
-              title={stat.title}
-              value={stat.value}
-              subtitle={stat.subtitle}
-              icon={stat.icon}
-              borderColor={stat.borderColor}
-              iconBgColor={stat.iconBgColor}
+        {/* Messages Interface */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-[calc(100vh-200px)] flex">
+          {/* Conversation List */}
+          <ConversationList
+            conversations={conversations}
+            activeConversationId={activeConversationId}
+            onConversationSelect={setActiveConversationId}
+            currentUserId={currentUserId}
+            userRole={userRole}
+            onStartConversation={handleStartConversation}
+          />
+
+          {/* Chat Window */}
+          {activeConversation ? (
+            <ChatWindow
+              conversation={activeConversation}
+              messages={conversationMessages}
+              currentUserId={currentUserId}
+              onSendMessage={handleSendMessage}
             />
-          ))}
-        </div>
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Counselor Performance Overview */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">
-                Counselor Performance Overview
-              </h2>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-[#0056b3] border-[#0056b3] hover:bg-[#0056b3] hover:text-white"
-              >
-                View Detailed Analytics
-              </Button>
+          ) : (
+            <div className="flex-1 flex items-center justify-center bg-gray-50">
+              <div className="text-center">
+                <MessageCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Select a conversation
+                </h3>
+                <p className="text-gray-500">
+                  Choose a conversation from the list to start messaging.
+                </p>
+              </div>
             </div>
-
-            <div className="space-y-4">
-              {counselorPerformance.map((counselor) => (
-                <Card
-                  key={counselor.id}
-                  className="hover:shadow-md transition-shadow duration-200"
-                >
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="bg-[#0056b3] text-white p-2 rounded-full">
-                          <UserCheck className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-gray-900">
-                            {counselor.name}
-                          </h3>
-                          <p className="text-sm text-gray-500">
-                            {counselor.specialization}
-                          </p>
-                        </div>
-                      </div>
-                      <Badge className={getStatusColor(counselor.status)}>
-                        {counselor.status === "on_leave"
-                          ? "On Leave"
-                          : "Active"}
-                      </Badge>
-                    </div>
-
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <p className="text-gray-500">Students Assigned</p>
-                        <p className="font-medium text-gray-900">
-                          {counselor.studentsAssigned}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">Monthly Sessions</p>
-                        <p className="font-medium text-gray-900">
-                          {counselor.appointmentsThisMonth}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">Avg. Duration</p>
-                        <p className="font-medium text-gray-900">
-                          {counselor.avgSessionDuration}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">Response Rate</p>
-                        <p className="font-medium text-green-600">
-                          {counselor.responseRate}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex space-x-2 mt-4">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-[#0056b3] border-[#0056b3] hover:bg-[#0056b3] hover:text-white"
-                      >
-                        View Details
-                      </Button>
-                      <Button size="sm" variant="outline">
-                        Manage Students
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-
-          {/* Recent Activities & Department Insights */}
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">
-                Recent Activities
-              </h2>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-[#0056b3] border-[#0056b3] hover:bg-[#0056b3] hover:text-white"
-              >
-                View All
-              </Button>
-            </div>
-
-            <div className="space-y-4">
-              {recentActivities.map((activity) => (
-                <Card
-                  key={activity.id}
-                  className={`border-l-4 ${getActivityColor(
-                    activity.priority
-                  )} hover:shadow-md transition-shadow duration-200`}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start space-x-3">
-                      <div className="bg-gray-100 p-2 rounded-full">
-                        <BarChart3 className="h-4 w-4 text-gray-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-900 leading-relaxed">
-                          {activity.description}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {activity.timestamp}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {/* Department Insights */}
-            <Card className="bg-gradient-to-r from-[#0056b3] to-[#004494] text-white">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <TrendingUp className="h-5 w-5" />
-                  <span>Department Insights</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-blue-100">Student Engagement</span>
-                    <span className="font-medium">↑ 12%</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-blue-100">
-                      Appointment Completion
-                    </span>
-                    <span className="font-medium">94%</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-blue-100">Counselor Utilization</span>
-                    <span className="font-medium">87%</span>
-                  </div>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full mt-4 border-white text-white hover:bg-white hover:text-[#0056b3]"
-                >
-                  View Full Analytics
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+          )}
         </div>
       </main>
     </div>
