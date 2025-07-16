@@ -68,9 +68,10 @@ export default function MessagesPage() {
       url: "/files/career-opportunities-cs.docx",
       uploadedAt: "2024-06-18T14:30:00Z",
       uploadedBy: "Prof. Ahmad Hassan",
-    queryFn: dashboardService.getDashboardStats,
-    enabled: !!user,
-  });
+      sharedWith: ["Ahmad Ali"],
+      description: "Career opportunities in Computer Science field",
+    },
+  ]);
 
   // Mock messages data
   const [messages] = useState([
@@ -108,7 +109,6 @@ export default function MessagesPage() {
       content: "Here's the academic planning guide I mentioned:",
       timestamp: "2024-06-20T15:02:00Z",
       isRead: true,
-      attachment: mockAttachment,
     },
     {
       id: "5",
@@ -256,64 +256,14 @@ export default function MessagesPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-  // Fetch recent appointments
-  const { data: recentAppointments, isLoading: appointmentsLoading } = useQuery({
-    queryKey: ['dashboard', 'appointments', user?.id],
-    queryFn: () => dashboardService.getRecentAppointments(2),
-    enabled: !!user,
-  });
-
-  // Fetch recent messages
-  const { data: recentMessages, isLoading: messagesLoading } = useQuery({
-    queryKey: ['dashboard', 'messages', user?.id],
-    queryFn: () => dashboardService.getRecentMessages(2),
-    enabled: !!user,
-  });
-
-  // Create stats data from API response
-  const statsData = dashboardStats ? [
-    {
-      title: "Upcoming Appointments",
-      value: dashboardStats.upcomingAppointments?.toString() || "0",
-      subtitle: "This week",
-      icon: Calendar,
-      borderColor: "border-l-blue-500",
-      iconBgColor: "bg-orange-500",
-    },
-    {
-      title: "Unread Messages",
-      value: dashboardStats.unreadMessages?.toString() || "0",
-      subtitle: "From counselors",
-      icon: MessageCircle,
-      borderColor: "border-l-green-500",
-      iconBgColor: "bg-yellow-500",
-    },
-    {
-      title: "Resources Available",
-      value: dashboardStats.resourcesAvailable?.toString() || "0",
-      subtitle: "New this month",
-      icon: BookOpen,
-      borderColor: "border-l-purple-500",
-      iconBgColor: "bg-yellow-600",
-    },
-    {
-      title: "Session Hours",
-      value: dashboardStats.sessionHours?.toString() || "0",
-      subtitle: "This semester",
-      icon: Clock,
-      borderColor: "border-l-red-500",
-      iconBgColor: "bg-orange-600",
-    },
-  ] : [];
-
-  const isLoading = statsLoading || appointmentsLoading || messagesLoading;
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0056b3]"></div>
+          <div className="text-center">
+            <MessageCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              Access Restricted
+            </h3>
+            <p className="text-gray-500">
+              Chairpersons do not have access to the messaging system.
+            </p>
           </div>
         </main>
       </div>
@@ -356,24 +306,16 @@ export default function MessagesPage() {
               onSendMessage={handleSendMessage}
             />
           ) : (
-              {recentAppointments?.map((appointment, index) => (
+            <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
                 <MessageCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
                   Select a conversation
-              {recentMessages?.map((message, index) => (
+                </h3>
                 <p className="text-gray-500">
                   Choose a conversation from the list to start messaging.
                 </p>
-              )) || (
-                <p className="text-gray-500 text-center py-4">
-                  No upcoming appointments
-                </p>
-              )) || (
-                <p className="text-gray-500 text-center py-4">
-                  No recent messages
-                </p>
-              )}
+              </div>
             </div>
           )}
         </div>
