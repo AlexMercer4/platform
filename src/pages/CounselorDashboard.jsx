@@ -68,6 +68,10 @@ export default function MessagesPage() {
       url: "/files/career-opportunities-cs.docx",
       uploadedAt: "2024-06-18T14:30:00Z",
       uploadedBy: "Prof. Ahmad Hassan",
+      sharedWith: ["Ahmad Ali"],
+      description: "Career opportunities in Computer Science field",
+    },
+  ]);
 
   // Mock messages data
   const [messages] = useState([
@@ -105,7 +109,7 @@ export default function MessagesPage() {
       content: "Here's the academic planning guide I mentioned:",
       timestamp: "2024-06-20T15:02:00Z",
       isRead: true,
-      attachment: mockAttachment,
+      attachment: sharedResources[0],
     },
     {
       id: "5",
@@ -242,76 +246,11 @@ export default function MessagesPage() {
       setConversations((prev) => [newConversation, ...prev]);
       setActiveConversationId(newConversation.id);
       toast.success(`Started conversation with ${targetUser.name}`);
-  // Fetch dashboard statistics
-  const { data: dashboardStats, isLoading: statsLoading } = useQuery({
-    queryKey: ['dashboard', 'stats', user?.id],
-    queryFn: dashboardService.getDashboardStats,
-    enabled: !!user,
-  });
-      throw error;
-  // Fetch today's appointments
-  const { data: todayAppointments, isLoading: appointmentsLoading } = useQuery({
-    queryKey: ['dashboard', 'appointments', user?.id],
-    queryFn: () => dashboardService.getRecentAppointments(3),
-    enabled: !!user,
-  });
-
-  // Fetch recent messages
-  const { data: recentMessages, isLoading: messagesLoading } = useQuery({
-    queryKey: ['dashboard', 'messages', user?.id],
-    queryFn: () => dashboardService.getRecentMessages(3),
-    enabled: !!user,
-  });
-
-  // Create stats data from API response
-  const statsData = dashboardStats ? [
-    {
-      title: "Today's Appointments",
-      value: dashboardStats.todayAppointments?.toString() || "0",
-      subtitle: `${dashboardStats.pendingAppointments || 0} pending approval`,
-      icon: Calendar,
-      borderColor: "border-l-blue-500",
-      iconBgColor: "bg-blue-500",
-    },
-    {
-      title: "Active Students",
-      value: dashboardStats.activeStudents?.toString() || "0",
-      subtitle: "This semester",
-      icon: Users,
-      borderColor: "border-l-green-500",
-      iconBgColor: "bg-green-500",
-    },
-    {
-      title: "Unread Messages",
-      value: dashboardStats.unreadMessages?.toString() || "0",
-      subtitle: "From students",
-      icon: MessageCircle,
-      borderColor: "border-l-yellow-500",
-      iconBgColor: "bg-yellow-500",
-    },
-    {
-      title: "Session Hours",
-      value: dashboardStats.sessionHours?.toString() || "0",
-      subtitle: "This month",
-      icon: Clock,
-      borderColor: "border-l-purple-500",
-      iconBgColor: "bg-purple-500",
-    },
-  ] : [];
-
-  const isLoading = statsLoading || appointmentsLoading || messagesLoading;
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0056b3]"></div>
-          </div>
-        </main>
-      </div>
-    );
-  }
+    } catch (error) {
+      console.error("Error starting conversation:", error);
+      toast.error("Failed to start conversation");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -349,24 +288,16 @@ export default function MessagesPage() {
               onSendMessage={handleSendMessage}
             />
           ) : (
-              {todayAppointments?.map((appointment, index) => (
+            <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
                 <MessageCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
                   Select a conversation
-              {recentMessages?.map((message, index) => (
+                </h3>
                 <p className="text-gray-500">
                   Choose a conversation from the list to start messaging.
                 </p>
-              )) || (
-                <p className="text-gray-500 text-center py-4">
-                  No appointments today
-                </p>
-              )) || (
-                <p className="text-gray-500 text-center py-4">
-                  No recent messages
-                </p>
-              )}
+              </div>
             </div>
           )}
         </div>
