@@ -7,7 +7,7 @@ This plan outlines the migration of the counseling platform frontend from using 
 
 ### Technology Stack
 - **Frontend Framework**: React 18 with Vite
-- **Routing**: React Router DOM v7
+- **Routing**: React Router DOM v6
 - **State Management**: React Query (TanStack Query) v5 - Already configured
 - **HTTP Client**: Axios - Already configured with interceptors
 - **UI Components**: Radix UI + Tailwind CSS
