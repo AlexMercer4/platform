@@ -47,6 +47,8 @@ export default function MessagesPage() {
     },
   ];
 
+  const statsLoading = false;
+
   if (statsLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -58,6 +60,14 @@ export default function MessagesPage() {
       </div>
     );
   }
+
+  const mockAttachment = {
+    id: "1",
+    name: "Academic_Planning_Guide_2024.pdf",
+    size: "2.1 MB",
+    type: "application/pdf",
+    url: "/files/academic-planning-guide.pdf",
+  };
 
   // Mock shared resources data
   const [sharedResources] = useState([
@@ -80,35 +90,10 @@ export default function MessagesPage() {
       url: "/files/career-opportunities-cs.docx",
       uploadedAt: "2024-06-18T14:30:00Z",
       uploadedBy: "Prof. Ahmad Hassan",
-      icon: Users,
-      borderColor: "border-l-blue-500",
-      iconBgColor: "bg-blue-500",
+      sharedWith: ["Ahmad Ali"],
+      description: "Career opportunities in Computer Science",
     },
-    {
-      title: "Active Counselors",
-      value: dashboardStats.activeCounselors?.toString() || "0",
-      subtitle: "Currently assigned",
-      icon: UserCheck,
-      borderColor: "border-l-green-500",
-      iconBgColor: "bg-green-500",
-    },
-    {
-      title: "Monthly Appointments",
-      value: dashboardStats.monthlyAppointments?.toString() || "0",
-      subtitle: "This month",
-      icon: Calendar,
-      borderColor: "border-l-purple-500",
-      iconBgColor: "bg-purple-500",
-    },
-    {
-      title: "Avg. Response Time",
-      value: dashboardStats.avgResponseTime || "0h",
-      subtitle: "Counselor response",
-      icon: Clock,
-      borderColor: "border-l-orange-500",
-      iconBgColor: "bg-orange-500",
-    },
-  ] : [];
+  ]);
 
   // Mock messages data
   const [messages] = useState([
