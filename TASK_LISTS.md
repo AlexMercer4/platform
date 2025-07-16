@@ -6,18 +6,14 @@
 
 - [ ] **Create service layer structure**
   - [ ] Create `src/services/` directory
-│   ├── auth.service.js         // Authentication services
-│   ├── users.service.js        // User management services
+├── services/
+│   ├── auth.service.js        // Authentication services
+│   ├── users.service.js       // User management services
 │   ├── appointments.service.js // Appointment services
-│   ├── messages.service.js     // Messaging services
-│   ├── notes.service.js        // Student notes services
-│   ├── dashboard.service.js    // Dashboard/analytics services
-│   ├── upload.service.js       // File upload services (single file)
-│   ├── bus.service.js          // Bus management API calls
-│   ├── schedule.service.js     // Schedule management API calls
-│   ├── booking.service.js      // Booking management API calls
-│   ├── search.service.js       // Search functionality API calls
-│   └── analytics.service.js    // Analytics API calls
+│   ├── messages.service.js    // Messaging services
+│   ├── notes.service.js       // Student notes services
+│   ├── dashboard.service.js   // Dashboard/analytics services
+│   └── upload.service.js      // File upload services (single file)
 
 
 ### 1.2 Authentication Services
