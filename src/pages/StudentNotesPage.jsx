@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   FileText,
@@ -10,7 +11,15 @@ import {
   EyeOff,
   Calendar,
   User,
+  Loader2,
+  AlertCircle,
+  Filter,
+  Lock,
+  Globe,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { notesService } from "@/services/notes.service";
+import { studentsService } from "@/services/students.service";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -46,16 +55,16 @@ import { toast } from "sonner";
 export default function StudentNotesPage() {
   const { studentId } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
 
-  const [notes, setNotes] = useState([]);
-  const [filteredNotes, setFilteredNotes] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState("all");
+  const [filterPrivacy, setFilterPrivacy] = useState("all");
   const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editingNote, setEditingNote] = useState(null);
   const [noteToDelete, setNoteToDelete] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
 
   // Form state
   const [noteContent, setNoteContent] = useState("");
@@ -71,104 +80,103 @@ export default function StudentNotesPage() {
     { value: "general", label: "General Notes" },
   ];
 
-  // Mock student data - replace with actual API call
-  const studentData = {
-    id: studentId,
-    name:
-      studentId === "1"
-        ? "Ahmad Ali"
-        : studentId === "2"
-        ? "Fatima Khan"
-        : "Hassan Ahmed",
-    studentId:
-      studentId === "1"
-        ? "CS-2024-001"
-        : studentId === "2"
-        ? "EE-2024-015"
-        : "ME-2024-032",
-    department:
-      studentId === "1"
-        ? "Computer Science"
-        : studentId === "2"
-        ? "Electrical Engineering"
-        : "Mechanical Engineering",
-    semester: studentId === "1" ? "6th" : studentId === "2" ? "4th" : "8th",
-  };
-
-  // Mock notes data - replace with actual API call
-  useEffect(() => {
-    const mockNotes = [
-      {
-        id: "1",
-        studentId: studentId || "1",
-        studentName: studentData.name,
-        category: "academic",
-        content:
-          "Student is showing excellent progress in programming courses. Particularly strong in data structures and algorithms. Recommended for advanced courses next semester.",
-        isPrivate: false,
-        createdAt: "2024-06-20T10:00:00Z",
-        updatedAt: "2024-06-20T10:00:00Z",
-        createdBy: "Dr. Sarah Ahmed",
-      },
-      {
-        id: "2",
-        studentId: studentId || "1",
-        studentName: studentData.name,
-        category: "career",
-        content:
-          "Discussed career opportunities in software development. Student expressed interest in full-stack development and AI/ML. Provided resources for internship applications.",
-        isPrivate: true,
-        createdAt: "2024-06-18T14:30:00Z",
-        updatedAt: "2024-06-18T14:30:00Z",
-        createdBy: "Dr. Sarah Ahmed",
-      },
-      {
-        id: "3",
-        studentId: studentId || "1",
-        studentName: studentData.name,
-        category: "personal",
-        content:
-          "Student mentioned feeling overwhelmed with course load. Discussed time management strategies and stress reduction techniques. Follow-up scheduled.",
-        isPrivate: true,
-        createdAt: "2024-06-15T11:15:00Z",
-        updatedAt: "2024-06-15T11:15:00Z",
-        createdBy: "Dr. Sarah Ahmed",
-      },
-      {
-        id: "4",
-        studentId: studentId || "1",
-        studentName: studentData.name,
-        category: "behavioral",
-        content:
-          "Student has been actively participating in class discussions and group projects. Shows good leadership qualities and helps fellow students.",
-        isPrivate: false,
-        createdAt: "2024-06-10T09:45:00Z",
-        updatedAt: "2024-06-10T09:45:00Z",
-        createdBy: "Prof. Ahmad Hassan",
-      },
-    ];
-
-    setNotes(mockNotes);
-  }, [studentId]);
-
-  // Filter notes based on search and category
-  useEffect(() => {
-    let filtered = notes;
-
-    if (searchQuery) {
-      filtered = filtered.filter(
-        (note) =>
-          note.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          note.category.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+  // Fetch student data
+  const { 
+    data: studentData, 
+    isLoading: isLoadingStudent,
+    error: studentError
+  } = useQuery({
+    queryKey: ['student', studentId],
+    queryFn: () => studentsService.getStudentById(studentId),
+    onError: (error) => {
+      toast.error(`Failed to load student data: ${error.message}`);
     }
+  });
 
-    if (filterCategory !== "all") {
-      filtered = filtered.filter((note) => note.category === filterCategory);
+  // Fetch student notes
+  const { 
+    data, 
+    isLoading: isLoadingNotes,
+    error: notesError
+  } = useQuery({
+    queryKey: ['studentNotes', studentId],
+    queryFn: () => notesService.getStudentNotes(studentId),
+    onError: (error) => {
+      toast.error(`Failed to load student notes: ${error.message}`);
     }
+  });
+  
+  // Ensure notes is always an array
+  console.log("Notes data received:", data);
+  const notes = Array.isArray(data?.data) ? data.data : [];
 
-    setFilteredNotes(filtered);
-  }, [notes, searchQuery, filterCategory]);
+  // Create note mutation
+  const createNoteMutation = useMutation({
+    mutationFn: (noteData) => notesService.createNote(studentId, noteData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['studentNotes', studentId] });
+      toast.success("Note added successfully");
+      setIsAddEditDialogOpen(false);
+      resetForm();
+    },
+    onError: (error) => {
+      toast.error(`Failed to add note: ${error.message}`);
+    }
+  });
+
+  // Update note mutation
+  const updateNoteMutation = useMutation({
+    mutationFn: ({ noteId, noteData }) => notesService.updateNote(noteId, noteData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['studentNotes', studentId] });
+      toast.success("Note updated successfully");
+      setIsAddEditDialogOpen(false);
+      resetForm();
+    },
+    onError: (error) => {
+      toast.error(`Failed to update note: ${error.message}`);
+    }
+  });
+
+  // Delete note mutation
+  const deleteNoteMutation = useMutation({
+    mutationFn: (noteId) => notesService.deleteNote(noteId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['studentNotes', studentId] });
+      toast.success("Note deleted successfully");
+      setIsDeleteDialogOpen(false);
+      setNoteToDelete(null);
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete note: ${error.message}`);
+    }
+  });
+
+  // Filter notes based on search, category, and privacy
+  const filteredNotes = Array.isArray(notes) ? notes.filter(note => {
+    // Apply search filter
+    if (searchQuery && 
+        !note.content.toLowerCase().includes(searchQuery.toLowerCase()) && 
+        !note.category.toLowerCase().includes(searchQuery.toLowerCase())) {
+      return false;
+    }
+    
+    // Apply category filter
+    if (filterCategory !== "all" && note.category !== filterCategory) {
+      return false;
+    }
+    
+    // Apply privacy filter
+    if (filterPrivacy === "private" && !note.isPrivate) {
+      return false;
+    }
+    
+    if (filterPrivacy === "shared" && note.isPrivate) {
+      return false;
+    }
+    
+    return true;
+  }) : [];
 
   const handleAddNote = () => {
     setEditingNote(null);
@@ -194,48 +202,31 @@ export default function StudentNotesPage() {
   const handleSaveNote = async () => {
     if (!noteContent.trim() || !noteCategory) return;
 
-    setIsLoading(true);
     try {
       if (editingNote) {
         // Update existing note
-        const updatedNote = {
-          ...editingNote,
+        const noteData = {
           content: noteContent.trim(),
           category: noteCategory,
-          isPrivate,
-          updatedAt: new Date().toISOString(),
+          isPrivate
         };
-
-        setNotes((prev) =>
-          prev.map((note) => (note.id === editingNote.id ? updatedNote : note))
-        );
-        toast.success("Note updated successfully");
+        
+        updateNoteMutation.mutate({ 
+          noteId: editingNote.id, 
+          noteData 
+        });
       } else {
         // Add new note
-        const newNote = {
-          id: Date.now().toString(),
-          studentId: studentId || "1",
-          studentName: studentData.name,
+        const noteData = {
           category: noteCategory,
           content: noteContent.trim(),
-          isPrivate,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          createdBy: "Dr. Sarah Ahmed",
+          isPrivate
         };
-
-        setNotes((prev) => [newNote, ...prev]);
-        toast.success("Note added successfully");
+        
+        createNoteMutation.mutate(noteData);
       }
-
-      setIsAddEditDialogOpen(false);
-      resetForm();
     } catch (error) {
-      console.log(error);
-
-      toast.error("Failed to save note. Please try again.");
-    } finally {
-      setIsLoading(false);
+      console.error("Error saving note:", error);
     }
   };
 
@@ -243,13 +234,9 @@ export default function StudentNotesPage() {
     if (!noteToDelete) return;
 
     try {
-      setNotes((prev) => prev.filter((note) => note.id !== noteToDelete.id));
-      toast.success("Note deleted successfully");
-      setIsDeleteDialogOpen(false);
-      setNoteToDelete(null);
+      deleteNoteMutation.mutate(noteToDelete.id);
     } catch (error) {
-      console.log(error);
-      toast.error("Failed to delete note. Please try again.");
+      console.error("Error deleting note:", error);
     }
   };
 
@@ -290,6 +277,64 @@ export default function StudentNotesPage() {
   };
 
   const isFormValid = noteContent.trim() && noteCategory;
+  const isLoading = createNoteMutation.isPending || updateNoteMutation.isPending || deleteNoteMutation.isPending;
+
+  // Handle loading state for student data and notes
+  if (isLoadingStudent || isLoadingNotes) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading student notes...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle error state
+  if (studentError || notesError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Error Loading Data</h2>
+          <p className="text-gray-600 mb-4">
+            {studentError?.message || notesError?.message || "Failed to load student data or notes. Please try again."}
+          </p>
+          <Button 
+            onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ['student', studentId] });
+              queryClient.invalidateQueries({ queryKey: ['studentNotes', studentId] });
+            }}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // If student data is not available
+  if (!studentData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
+          <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Student Not Found</h2>
+          <p className="text-gray-600 mb-4">
+            The requested student could not be found or you don't have permission to view their notes.
+          </p>
+          <Button 
+            onClick={() => navigate("/students")}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            Back to Students
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -313,7 +358,7 @@ export default function StudentNotesPage() {
             </h1>
             <p className="text-gray-600 mt-2">
               {studentData.studentId} • {studentData.department} •{" "}
-              {studentData.semester} Semester
+              {studentData.currentSemester || "N/A"}
             </p>
           </div>
 
@@ -337,19 +382,42 @@ export default function StudentNotesPage() {
             />
           </div>
 
-          <Select value={filterCategory} onValueChange={setFilterCategory}>
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Filter by category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {noteCategories.map((category) => (
-                <SelectItem key={category.value} value={category.value}>
-                  {category.label}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Select value={filterCategory} onValueChange={setFilterCategory}>
+              <SelectTrigger className="w-full sm:w-48">
+                <SelectValue placeholder="Filter by category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {noteCategories.map((category) => (
+                  <SelectItem key={category.value} value={category.value}>
+                    {category.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={filterPrivacy} onValueChange={setFilterPrivacy}>
+              <SelectTrigger className="w-full sm:w-40">
+                <SelectValue placeholder="Privacy" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Notes</SelectItem>
+                <SelectItem value="private">
+                  <div className="flex items-center">
+                    <Lock className="h-3.5 w-3.5 mr-2" />
+                    <span>Private</span>
+                  </div>
                 </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+                <SelectItem value="shared">
+                  <div className="flex items-center">
+                    <Globe className="h-3.5 w-3.5 mr-2" />
+                    <span>Shared</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Notes List */}
@@ -357,16 +425,16 @@ export default function StudentNotesPage() {
           <div className="text-center py-12">
             <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {searchQuery || filterCategory !== "all"
+              {searchQuery || filterCategory !== "all" || filterPrivacy !== "all"
                 ? "No notes found"
                 : "No notes yet"}
             </h3>
             <p className="text-gray-500 mb-4">
-              {searchQuery || filterCategory !== "all"
+              {searchQuery || filterCategory !== "all" || filterPrivacy !== "all"
                 ? "Try adjusting your search or filter criteria"
                 : "Start by adding the first note for this student"}
             </p>
-            {!searchQuery && filterCategory === "all" && (
+            {!searchQuery && filterCategory === "all" && filterPrivacy === "all" && (
               <Button
                 onClick={handleAddNote}
                 className="bg-[#0056b3] hover:bg-[#004494]"
@@ -390,15 +458,15 @@ export default function StudentNotesPage() {
                           (cat) => cat.value === note.category
                         )?.label || note.category}
                       </Badge>
-                      <div className="flex items-center space-x-2 text-sm text-gray-500">
+                      <div className="flex items-center space-x-2 text-sm">
                         {note.isPrivate ? (
-                          <div className="flex items-center space-x-1">
-                            <EyeOff className="h-3 w-3" />
+                          <div className="flex items-center space-x-1 bg-red-50 text-red-700 px-2 py-0.5 rounded-full">
+                            <Lock className="h-3 w-3" />
                             <span>Private</span>
                           </div>
                         ) : (
-                          <div className="flex items-center space-x-1">
-                            <Eye className="h-3 w-3" />
+                          <div className="flex items-center space-x-1 bg-green-50 text-green-700 px-2 py-0.5 rounded-full">
+                            <Globe className="h-3 w-3" />
                             <span>Shared</span>
                           </div>
                         )}
@@ -406,22 +474,27 @@ export default function StudentNotesPage() {
                     </div>
 
                     <div className="flex items-center space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditNote(note)}
-                        className="text-gray-500 hover:text-gray-700"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteNote(note)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {/* Only show edit/delete buttons for notes created by the current user */}
+                      {note.counselorId === user?.id && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditNote(note)}
+                            className="text-gray-500 hover:text-gray-700"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteNote(note)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -435,7 +508,9 @@ export default function StudentNotesPage() {
                     <div className="flex items-center space-x-4">
                       <div className="flex items-center space-x-1">
                         <User className="h-3 w-3" />
-                        <span>{note.createdBy}</span>
+                        <span className={note.counselorId === user?.id ? "font-medium text-blue-600" : ""}>
+                          {note.counselorId === user?.id ? "You" : note.createdBy}
+                        </span>
                       </div>
                       <div className="flex items-center space-x-1">
                         <Calendar className="h-3 w-3" />
@@ -517,18 +592,24 @@ export default function StudentNotesPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="private">
-                      Private (Only visible to you)
+                      <div className="flex items-center">
+                        <Lock className="h-4 w-4 mr-2 text-red-600" />
+                        <span>Private (Only visible to you)</span>
+                      </div>
                     </SelectItem>
                     <SelectItem value="shared">
-                      Shared (Visible to other counselors)
+                      <div className="flex items-center">
+                        <Globe className="h-4 w-4 mr-2 text-green-600" />
+                        <span>Shared (Visible to other counselors)</span>
+                      </div>
                     </SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-gray-500">
+                <div className={`text-xs p-2 rounded-md ${isPrivate ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
                   {isPrivate
-                    ? "This note will only be visible to you"
-                    : "This note will be visible to other counselors working with this student"}
-                </p>
+                    ? "This note will only be visible to you. Other counselors working with this student will not be able to see it."
+                    : "This note will be visible to all counselors working with this student. Use this for information that should be shared with the team."}
+                </div>
               </div>
             </div>
 

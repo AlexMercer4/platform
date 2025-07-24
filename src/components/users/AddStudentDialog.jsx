@@ -32,16 +32,14 @@ export default function AddStudentDialog({ open, onOpenChange, onSubmit }) {
     email: "",
     phone: "",
     address: "",
-    cmsId: "",
+    studentId: "",
     department: "",
     batch: "",
     currentSemester: "",
     password: "",
-    emergencyContact: {
-      name: "",
-      phone: "",
-      relationship: "",
-    },
+    emergencyContactName: "",
+    emergencyContactPhone: "",
+    emergencyContactRelationship: "",
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -90,10 +88,7 @@ export default function AddStudentDialog({ open, onOpenChange, onSubmit }) {
   const handleEmergencyContactChange = (field, value) => {
     setFormData((prev) => ({
       ...prev,
-      emergencyContact: {
-        ...prev.emergencyContact,
-        [field]: value,
-      },
+      [field]: value,
     }));
   };
 
@@ -118,23 +113,21 @@ export default function AddStudentDialog({ open, onOpenChange, onSubmit }) {
       email: "",
       phone: "",
       address: "",
-      cmsId: "",
+      studentId: "",
       department: "",
       batch: "",
       currentSemester: "",
       password: "",
-      emergencyContact: {
-        name: "",
-        phone: "",
-        relationship: "",
-      },
+      emergencyContactName: "",
+      emergencyContactPhone: "",
+      emergencyContactRelationship: "",
     });
   };
 
   const isFormValid =
     formData.name &&
     formData.email &&
-    formData.cmsId &&
+    formData.studentId &&
     formData.department &&
     formData.batch &&
     formData.currentSemester &&
@@ -198,11 +191,11 @@ export default function AddStudentDialog({ open, onOpenChange, onSubmit }) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="cmsId">CMS ID *</Label>
+                <Label htmlFor="studentId">Student ID *</Label>
                 <Input
-                  id="cmsId"
-                  value={formData.cmsId}
-                  onChange={(e) => handleInputChange("cmsId", e.target.value)}
+                  id="studentId"
+                  value={formData.studentId}
+                  onChange={(e) => handleInputChange("studentId", e.target.value)}
                   placeholder="CS-2024-001"
                   required
                 />
@@ -307,9 +300,9 @@ export default function AddStudentDialog({ open, onOpenChange, onSubmit }) {
                 <Label htmlFor="emergencyName">Contact Name</Label>
                 <Input
                   id="emergencyName"
-                  value={formData.emergencyContact?.name || ""}
+                  value={formData.emergencyContactName}
                   onChange={(e) =>
-                    handleEmergencyContactChange("name", e.target.value)
+                    handleEmergencyContactChange("emergencyContactName", e.target.value)
                   }
                   placeholder="Emergency contact name"
                 />
@@ -319,9 +312,9 @@ export default function AddStudentDialog({ open, onOpenChange, onSubmit }) {
                 <Label htmlFor="emergencyPhone">Contact Phone</Label>
                 <Input
                   id="emergencyPhone"
-                  value={formData.emergencyContact?.phone || ""}
+                  value={formData.emergencyContactPhone}
                   onChange={(e) =>
-                    handleEmergencyContactChange("phone", e.target.value)
+                    handleEmergencyContactChange("emergencyContactPhone", e.target.value)
                   }
                   placeholder="+92 300 1234567"
                 />
@@ -331,9 +324,9 @@ export default function AddStudentDialog({ open, onOpenChange, onSubmit }) {
                 <Label htmlFor="emergencyRelationship">Relationship</Label>
                 <Input
                   id="emergencyRelationship"
-                  value={formData.emergencyContact?.relationship || ""}
+                  value={formData.emergencyContactRelationship}
                   onChange={(e) =>
-                    handleEmergencyContactChange("relationship", e.target.value)
+                    handleEmergencyContactChange("emergencyContactRelationship", e.target.value)
                   }
                   placeholder="Father, Mother, etc."
                 />

@@ -1,629 +1,497 @@
 import { useState } from "react";
-import {
-  TrendingUp,
-  BarChart3,
-  PieChart,
-  Calendar,
-  Users,
-  Clock,
-  Award,
-  Download,
-  Filter,
-  RefreshCw,
-} from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { useQuery } from "@tanstack/react-query";
+import { analyticsService } from "@/services/analytics.service";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { CalendarIcon, BarChart3, PieChart, Users, UserCheck, Clock, Loader2, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function AnalyticsPage() {
-  const [selectedTimeRange, setSelectedTimeRange] = useState("6months");
-  const [selectedDepartment, setSelectedDepartment] = useState("all");
-  const [selectedCounselor, setSelectedCounselor] = useState("all");
+  const { user } = useAuth();
+  const [timeframe, setTimeframe] = useState("all");
+  const [startDate, setStartDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
+  const [activeTab, setActiveTab] = useState("overview");
 
-  // Mock analytics data - replace with actual API calls
-  const analyticsData = {
-    overview: {
-      totalStudents: 342,
-      activeStudents: 298,
-      totalCounselors: 8,
-      activeCounselors: 7,
-      totalAppointments: 1247,
-      completedAppointments: 1156,
-      averageSessionDuration: 45,
-      studentSatisfaction: 4.7,
-      responseTime: 2.4,
-      utilizationRate: 87,
-    },
-
-    departmentMetrics: [
-      {
-        department: "Computer Science",
-        students: 89,
-        counselors: 2,
-        appointments: 342,
-        satisfaction: 4.8,
-      },
-      {
-        department: "Electrical Engineering",
-        students: 76,
-        counselors: 2,
-        appointments: 298,
-        satisfaction: 4.6,
-      },
-      {
-        department: "Mechanical Engineering",
-        students: 68,
-        counselors: 1,
-        appointments: 245,
-        satisfaction: 4.5,
-      },
-      {
-        department: "Civil Engineering",
-        students: 54,
-        counselors: 1,
-        appointments: 189,
-        satisfaction: 4.7,
-      },
-      {
-        department: "Business Administration",
-        students: 55,
-        counselors: 2,
-        appointments: 173,
-        satisfaction: 4.9,
-      },
-    ],
-
-    monthlyTrends: [
-      {
-        month: "Jan",
-        appointments: 89,
-        students: 45,
-        completion: 92,
-        satisfaction: 4.5,
-      },
-      {
-        month: "Feb",
-        appointments: 102,
-        students: 58,
-        completion: 94,
-        satisfaction: 4.6,
-      },
-      {
-        month: "Mar",
-        appointments: 125,
-        students: 67,
-        completion: 89,
-        satisfaction: 4.4,
-      },
-      {
-        month: "Apr",
-        appointments: 143,
-        students: 78,
-        completion: 96,
-        satisfaction: 4.8,
-      },
-      {
-        month: "May",
-        appointments: 156,
-        students: 82,
-        completion: 93,
-        satisfaction: 4.7,
-      },
-      {
-        month: "Jun",
-        appointments: 178,
-        students: 95,
-        completion: 95,
-        satisfaction: 4.9,
-      },
-    ],
-
-    counselorPerformance: [
-      {
-        id: "1",
-        name: "Dr. Sarah Ahmed",
-        department: "Psychology",
-        studentsAssigned: 45,
-        appointmentsCompleted: 156,
-        avgSessionDuration: 48,
-        satisfaction: 4.9,
-      },
-      {
-        id: "2",
-        name: "Prof. Ahmad Hassan",
-        department: "Academic Affairs",
-        studentsAssigned: 38,
-        appointmentsCompleted: 134,
-        avgSessionDuration: 42,
-        satisfaction: 4.6,
-      },
-      {
-        id: "3",
-        name: "Dr. Fatima Sheikh",
-        department: "Career Services",
-        studentsAssigned: 41,
-        appointmentsCompleted: 145,
-        avgSessionDuration: 45,
-        satisfaction: 4.8,
-      },
-      {
-        id: "4",
-        name: "Dr. Ali Khan",
-        department: "Mental Health",
-        studentsAssigned: 35,
-        appointmentsCompleted: 98,
-        avgSessionDuration: 52,
-        satisfaction: 4.5,
-      },
-    ],
-
-    appointmentTypes: [
-      { type: "Academic Guidance", count: 445, percentage: 36, trend: "+12%" },
-      { type: "Career Counseling", count: 378, percentage: 30, trend: "+8%" },
-      {
-        type: "Personal Development",
-        count: 298,
-        percentage: 24,
-        trend: "+15%",
-      },
-      {
-        type: "Mental Health Support",
-        count: 126,
-        percentage: 10,
-        trend: "+22%",
-      },
-    ],
-  };
-
-  const timeRanges = [
-    { value: "1month", label: "Last Month" },
-    { value: "3months", label: "Last 3 Months" },
-    { value: "6months", label: "Last 6 Months" },
-    { value: "1year", label: "Last Year" },
-    { value: "custom", label: "Custom Range" },
-  ];
-
-  const departments = [
-    { value: "all", label: "All Departments" },
-    { value: "cs", label: "Computer Science" },
-    { value: "ee", label: "Electrical Engineering" },
-    { value: "me", label: "Mechanical Engineering" },
-    { value: "ce", label: "Civil Engineering" },
-    { value: "ba", label: "Business Administration" },
-  ];
-
-  const counselors = [
-    { value: "all", label: "All Counselors" },
-    { value: "1", label: "Dr. Sarah Ahmed" },
-    { value: "2", label: "Prof. Ahmad Hassan" },
-    { value: "3", label: "Dr. Fatima Sheikh" },
-    { value: "4", label: "Dr. Ali Khan" },
-  ];
-
-  const getPerformanceColor = (value, type) => {
-    if (type === "satisfaction") {
-      if (value >= 4.5) return "text-green-600";
-      if (value >= 4.0) return "text-yellow-600";
-      return "text-red-600";
+  // Fetch analytics data with React Query
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["analytics", timeframe, startDate, endDate],
+    queryFn: () => analyticsService.getAnalytics({ 
+      timeframe: timeframe !== "all" ? timeframe : undefined,
+      startDate: startDate ? format(startDate, "yyyy-MM-dd") : undefined,
+      endDate: endDate ? format(endDate, "yyyy-MM-dd") : undefined
+    }),
+    onError: (error) => {
+      toast.error(`Failed to load analytics: ${error.message}`);
     }
-    return "text-gray-600";
+  });
+
+  // Handle timeframe selection
+  const handleTimeframeChange = (value) => {
+    setTimeframe(value);
+    // Reset custom date range when selecting a predefined timeframe
+    if (value !== "custom") {
+      setStartDate(null);
+      setEndDate(null);
+    }
   };
 
-  const exportReport = () => {
-    // Implementation for exporting analytics report
-    console.log("Exporting analytics report...");
-  };
+  // Render loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading analytics...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const refreshData = () => {
-    // Implementation for refreshing analytics data
-    console.log("Refreshing analytics data...");
+  // Render error state
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Error Loading Analytics</h2>
+          <p className="text-gray-600 mb-4">
+            {error?.message || "Failed to load analytics data. Please try again."}
+          </p>
+          <Button 
+            onClick={() => window.location.reload()}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Extract data for easier access
+  const { overview, appointments, students, counselors } = data || {
+    overview: {},
+    appointments: { statusDistribution: {}, typeDistribution: {}, monthlyTrends: {} },
+    students: { departmentDistribution: {}, semesterDistribution: {}, topEngaged: [] },
+    counselors: { workloadDistribution: [], specializationDistribution: {} }
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Analytics & Insights
-            </h1>
-            <p className="text-gray-600 mt-2">
-              Comprehensive analytics for counseling services and student
-              engagement.
-            </p>
-          </div>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
+          <p className="text-gray-600 mt-2">
+            Comprehensive insights into counseling activities and student engagement.
+          </p>
+        </div>
+        
+        {/* Filters Section */}
+        <div className="mb-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Timeframe selector */}
+            <Select value={timeframe} onValueChange={handleTimeframeChange}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select timeframe" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Time</SelectItem>
+                <SelectItem value="week">Last 7 Days</SelectItem>
+                <SelectItem value="month">Last Month</SelectItem>
+                <SelectItem value="semester">Current Semester</SelectItem>
+                <SelectItem value="custom">Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
 
-          <div className="flex items-center space-x-2 mt-4 sm:mt-0">
-            <Button
-              variant="outline"
-              onClick={refreshData}
-              className="flex items-center space-x-2"
-            >
-              <RefreshCw className="h-4 w-4" />
-              <span>Refresh</span>
-            </Button>
-            <Button
-              onClick={exportReport}
-              className="bg-[#0056b3] hover:bg-[#004494] flex items-center space-x-2"
-            >
-              <Download className="h-4 w-4" />
-              <span>Export Report</span>
-            </Button>
+            {/* Custom date range */}
+            {timeframe === "custom" && (
+              <div className="flex gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-[150px] justify-start text-left font-normal">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {startDate ? format(startDate, "MMM dd, yyyy") : "Start Date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={startDate}
+                      onSelect={setStartDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-[150px] justify-start text-left font-normal">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {endDate ? format(endDate, "MMM dd, yyyy") : "End Date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={endDate}
+                      onSelect={setEndDate}
+                      disabled={(date) => startDate && date < startDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-4 mb-8 p-4 bg-white rounded-lg border">
-          <div className="flex items-center space-x-2">
-            <Filter className="h-4 w-4 text-gray-500" />
-            <span className="text-sm font-medium text-gray-700">Filters:</span>
-          </div>
-
-          <Select
-            value={selectedTimeRange}
-            onValueChange={setSelectedTimeRange}
-          >
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {timeRanges.map((range) => (
-                <SelectItem key={range.value} value={range.value}>
-                  {range.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={selectedDepartment}
-            onValueChange={setSelectedDepartment}
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {departments.map((dept) => (
-                <SelectItem key={dept.value} value={dept.value}>
-                  {dept.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={selectedCounselor}
-            onValueChange={setSelectedCounselor}
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {counselors.map((counselor) => (
-                <SelectItem key={counselor.value} value={counselor.value}>
-                  {counselor.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Overview Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Overview Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">
-                    Total Students
-                  </p>
-                  <p className="text-3xl font-bold text-gray-900 mt-2">
-                    {analyticsData.overview.totalStudents}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {analyticsData.overview.activeStudents} active
-                  </p>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">
+                Total Students
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-baseline">
+                <div className="text-3xl font-bold text-gray-900">
+                  {overview.totalStudents || 0}
                 </div>
-                <div className="bg-blue-500 p-3 rounded-lg">
-                  <Users className="h-6 w-6 text-white" />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {overview.activeStudents || 0} active
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">
+                Total Counselors
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-baseline">
+                <div className="text-3xl font-bold text-gray-900">
+                  {overview.totalCounselors || 0}
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {overview.activeCounselors || 0} active
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">
+                Total Appointments
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-baseline">
+                <div className="text-3xl font-bold text-gray-900">
+                  {overview.totalAppointments || 0}
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">
-                    Appointments
-                  </p>
-                  <p className="text-3xl font-bold text-gray-900 mt-2">
-                    {analyticsData.overview.totalAppointments}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {Math.round(
-                      (analyticsData.overview.completedAppointments /
-                        analyticsData.overview.totalAppointments) *
-                        100
-                    )}
-                    % completion rate
-                  </p>
-                </div>
-                <div className="bg-green-500 p-3 rounded-lg">
-                  <Calendar className="h-6 w-6 text-white" />
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">
+                Completion Rate
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-baseline">
+                <div className="text-3xl font-bold text-gray-900">
+                  {overview.completionRate || 0}%
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">
-                    Avg. Session Duration
-                  </p>
-                  <p className="text-3xl font-bold text-gray-900 mt-2">
-                    {analyticsData.overview.averageSessionDuration}m
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">Per session</p>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">
+                Avg. Session Duration
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-baseline">
+                <div className="text-3xl font-bold text-gray-900">
+                  {appointments.averageDuration || 0}
                 </div>
-                <div className="bg-yellow-500 p-3 rounded-lg">
-                  <Clock className="h-6 w-6 text-white" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">
-                    Satisfaction Rate
-                  </p>
-                  <p className="text-3xl font-bold text-gray-900 mt-2">
-                    {analyticsData.overview.studentSatisfaction}/5
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">Student feedback</p>
-                </div>
-                <div className="bg-purple-500 p-3 rounded-lg">
-                  <Award className="h-6 w-6 text-white" />
-                </div>
+                <div className="ml-1 text-sm text-gray-500">min</div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Main Analytics Tabs - Removed Students, Trends, and Insights for chairperson */}
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
+        {/* Detailed Analytics Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="counselors">Counselors</TabsTrigger>
+            <TabsTrigger value="appointments">Appointments</TabsTrigger>
+            <TabsTrigger value="students">Students</TabsTrigger>
+            {user?.role === "CHAIRPERSON" && (
+              <TabsTrigger value="counselors">Counselors</TabsTrigger>
+            )}
           </TabsList>
-
+          
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Department Performance */}
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Appointment Status Distribution */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <BarChart3 className="h-5 w-5 text-[#0056b3]" />
-                    <span>Department Performance</span>
+                  <CardTitle className="flex items-center">
+                    <PieChart className="h-5 w-5 mr-2 text-blue-600" />
+                    Appointment Status
                   </CardTitle>
+                  <CardDescription>Distribution of appointment statuses</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {analyticsData.departmentMetrics.map((dept, index) => (
-                      <div key={index} className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium text-gray-900">
-                            {dept.department}
-                          </span>
-                          <div className="flex items-center space-x-4 text-sm text-gray-600">
-                            <span>{dept.students} students</span>
-                            <span>{dept.appointments} sessions</span>
-                            <span
-                              className={getPerformanceColor(
-                                dept.satisfaction,
-                                "satisfaction"
-                              )}
-                            >
-                              {dept.satisfaction}/5
-                            </span>
+                  {Object.keys(appointments.statusDistribution).length === 0 ? (
+                    <div className="flex items-center justify-center h-[200px]">
+                      <p className="text-gray-500">No appointment data available</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {Object.entries(appointments.statusDistribution).map(([status, count]) => (
+                        <div key={status} className="flex items-center">
+                          <div className="w-24 text-sm font-medium capitalize">{status}</div>
+                          <div className="flex-1 mx-4">
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div
+                                className={`h-2 rounded-full ${
+                                  status === 'completed' ? 'bg-green-500' :
+                                  status === 'scheduled' ? 'bg-blue-500' :
+                                  status === 'pending' ? 'bg-yellow-500' :
+                                  'bg-red-500'
+                                }`}
+                                style={{
+                                  width: `${Math.min(100, (count / Math.max(...Object.values(appointments.statusDistribution))) * 100)}%`
+                                }}
+                              />
+                            </div>
                           </div>
+                          <div className="w-12 text-right text-sm text-gray-500">{count}</div>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-[#0056b3] h-2 rounded-full"
-                            style={{
-                              width: `${(dept.appointments / 350) * 100}%`,
-                            }}
-                          ></div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
-              {/* Appointment Types Distribution */}
+              {/* Appointment Type Distribution */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <PieChart className="h-5 w-5 text-[#0056b3]" />
-                    <span>Appointment Types</span>
+                  <CardTitle className="flex items-center">
+                    <BarChart3 className="h-5 w-5 mr-2 text-blue-600" />
+                    Appointment Types
                   </CardTitle>
+                  <CardDescription>Distribution of appointment types</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {analyticsData.appointmentTypes.map((type, index) => (
-                      <div key={index} className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="font-medium text-gray-900">
-                            {type.type}
-                          </span>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-gray-600">
-                              {type.count} ({type.percentage}%)
-                            </span>
-                            <Badge
-                              variant="outline"
-                              className="text-green-600 border-green-600"
-                            >
-                              {type.trend}
-                            </Badge>
+                  {Object.keys(appointments.typeDistribution).length === 0 ? (
+                    <div className="flex items-center justify-center h-[200px]">
+                      <p className="text-gray-500">No appointment data available</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {Object.entries(appointments.typeDistribution).map(([type, count]) => (
+                        <div key={type} className="flex items-center">
+                          <div className="w-24 text-sm font-medium capitalize">{type}</div>
+                          <div className="flex-1 mx-4">
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-blue-600 h-2 rounded-full"
+                                style={{
+                                  width: `${Math.min(100, (count / Math.max(...Object.values(appointments.typeDistribution))) * 100)}%`
+                                }}
+                              />
+                            </div>
                           </div>
+                          <div className="w-12 text-right text-sm text-gray-500">{count}</div>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-[#0056b3] h-2 rounded-full"
-                            style={{ width: `${type.percentage}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
 
-            {/* Monthly Trends */}
+          {/* Appointments Tab */}
+          <TabsContent value="appointments" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <TrendingUp className="h-5 w-5 text-[#0056b3]" />
-                  <span>Monthly Trends</span>
-                </CardTitle>
+                <CardTitle>Monthly Appointment Trends</CardTitle>
+                <CardDescription>Number of appointments over the last 6 months</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-                  {analyticsData.monthlyTrends.map((month, index) => (
-                    <div
-                      key={index}
-                      className="text-center p-4 bg-gray-50 rounded-lg"
-                    >
-                      <h4 className="font-medium text-gray-900 mb-2">
-                        {month.month}
-                      </h4>
-                      <div className="space-y-1 text-sm">
-                        <div>
-                          <span className="text-gray-500">Appointments:</span>
-                          <span className="font-medium text-gray-900 ml-1">
-                            {month.appointments}
-                          </span>
+                {appointments.monthlyTrends && Object.keys(appointments.monthlyTrends).length > 0 ? (
+                  <div className="space-y-4">
+                    {Object.entries(appointments.monthlyTrends)
+                      .sort(([a], [b]) => a.localeCompare(b))
+                      .map(([month, count]) => (
+                        <div key={month} className="flex items-center">
+                          <div className="w-24 text-sm font-medium">{formatMonthYear(month)}</div>
+                          <div className="flex-1 mx-4">
+                            <div className="w-full bg-gray-200 rounded-full h-4">
+                              <div 
+                                className="bg-blue-600 rounded-full h-4" 
+                                style={{ 
+                                  width: `${Math.min(100, (count / Math.max(...Object.values(appointments.monthlyTrends))) * 100)}%` 
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <div className="w-12 text-right text-sm text-gray-500">{count}</div>
                         </div>
-                        <div>
-                          <span className="text-gray-500">Students:</span>
-                          <span className="font-medium text-gray-900 ml-1">
-                            {month.students}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Completion:</span>
-                          <span className="font-medium text-green-600 ml-1">
-                            {month.completion}%
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Rating:</span>
-                          <span className="font-medium text-purple-600 ml-1">
-                            {month.satisfaction}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                      ))}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-[300px]">
+                    <p className="text-gray-500">No appointment trend data available</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* Counselors Tab - Removed Response Time and Utilization */}
-          <TabsContent value="counselors" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Users className="h-5 w-5 text-[#0056b3]" />
-                  <span>Counselor Performance Dashboard</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  {analyticsData.counselorPerformance.map((counselor) => (
-                    <div
-                      key={counselor.id}
-                      className="p-6 border rounded-lg hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex items-start justify-between mb-4">
-                        <div>
-                          <h3 className="font-semibold text-gray-900">
-                            {counselor.name}
-                          </h3>
-                          <p className="text-sm text-gray-500">
-                            {counselor.department}
-                          </p>
+          {/* Students Tab */}
+          <TabsContent value="students" className="space-y-6">
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Department Distribution */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Department Distribution</CardTitle>
+                  <CardDescription>Students by department</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {students.departmentDistribution && Object.keys(students.departmentDistribution).length > 0 ? (
+                    <div className="space-y-4">
+                      {Object.entries(students.departmentDistribution).map(([dept, count]) => (
+                        <div key={dept} className="flex items-center">
+                          <div className="w-32 text-sm font-medium truncate" title={dept}>{dept}</div>
+                          <div className="flex-1 mx-4">
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div 
+                                className="bg-blue-600 rounded-full h-2" 
+                                style={{ 
+                                  width: `${Math.min(100, (count / Math.max(...Object.values(students.departmentDistribution))) * 100)}%` 
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <div className="w-12 text-right text-sm text-gray-500">{count}</div>
                         </div>
-                        <Badge
-                          className={getPerformanceColor(
-                            counselor.satisfaction,
-                            "satisfaction"
-                          )}
-                        >
-                          {counselor.satisfaction}/5 Rating
-                        </Badge>
-                      </div>
-
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div>
-                          <p className="text-gray-500">Students</p>
-                          <p className="font-medium text-gray-900">
-                            {counselor.studentsAssigned}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-gray-500">Sessions</p>
-                          <p className="font-medium text-gray-900">
-                            {counselor.appointmentsCompleted}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-gray-500">Avg. Duration</p>
-                          <p className="font-medium text-gray-900">
-                            {counselor.avgSessionDuration}m
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-gray-500">Satisfaction</p>
-                          <p
-                            className={`font-medium ${getPerformanceColor(
-                              counselor.satisfaction,
-                              "satisfaction"
-                            )}`}
-                          >
-                            {counselor.satisfaction}/5
-                          </p>
-                        </div>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                  ) : (
+                    <div className="flex items-center justify-center h-[200px]">
+                      <p className="text-gray-500">No department data available</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Top Engaged Students */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Most Engaged Students</CardTitle>
+                  <CardDescription>Students with most counseling sessions</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {students.topEngaged && students.topEngaged.length > 0 ? (
+                    <div className="space-y-4">
+                      {students.topEngaged.map((student, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center">
+                            <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm mr-3">
+                              {student.name.charAt(0)}
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-900">{student.name}</p>
+                              <p className="text-sm text-gray-500">{student.department}</p>
+                            </div>
+                          </div>
+                          <div className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md text-sm font-medium">
+                            {student.sessions} sessions
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-[200px]">
+                      <p className="text-gray-500">No student engagement data available</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
+
+          {/* Counselors Tab (only for chairperson) */}
+          {user?.role === "CHAIRPERSON" && (
+            <TabsContent value="counselors" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Counselor Workload</CardTitle>
+                  <CardDescription>Appointments handled by each counselor</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {counselors.workloadDistribution && counselors.workloadDistribution.length > 0 ? (
+                    <div className="space-y-4">
+                      {counselors.workloadDistribution.map((item, index) => (
+                        <div key={index} className="flex items-center">
+                          <div className="w-32 text-sm font-medium truncate" title={item.counselorName}>
+                            {item.counselorName}
+                          </div>
+                          <div className="flex-1 mx-4">
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div 
+                                className="bg-blue-600 rounded-full h-2" 
+                                style={{ 
+                                  width: `${Math.min(100, (item.appointmentCount / Math.max(...counselors.workloadDistribution.map(c => c.appointmentCount))) * 100)}%` 
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <div className="w-12 text-right text-sm text-gray-500">{item.appointmentCount}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-[300px]">
+                      <p className="text-gray-500">No counselor workload data available</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
         </Tabs>
       </main>
     </div>
   );
+}
+
+// Helper function to format month-year string
+function formatMonthYear(monthYearStr) {
+  const [year, month] = monthYearStr.split('-');
+  const date = new Date(parseInt(year), parseInt(month) - 1);
+  return format(date, 'MMM yyyy');
 }

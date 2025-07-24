@@ -4,13 +4,13 @@ export const counselorsService = {
   // Get counselors list
   getCounselors: async (filters = {}) => {
     const response = await axiosInstance.get('/counselors', { params: filters });
-    return response.data;
+    return response.data.data || [];
   },
 
   // Get counselor details
   getCounselorById: async (counselorId) => {
     const response = await axiosInstance.get(`/counselors/${counselorId}`);
-    return response.data;
+    return response.data.data || response.data;
   },
 
   // Update counselor profile
@@ -22,6 +22,12 @@ export const counselorsService = {
   // Get counselor's assigned students
   getCounselorStudents: async (counselorId) => {
     const response = await axiosInstance.get(`/counselors/${counselorId}/students`);
+    return response.data;
+  },
+
+  // Get student's assigned counselor
+  getAssignedCounselor: async () => {
+    const response = await axiosInstance.get('/counselors/assigned');
     return response.data;
   }
 };

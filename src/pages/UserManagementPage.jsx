@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Users, UserPlus, GraduationCap, UserCheck } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Users, UserPlus, GraduationCap, UserCheck, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +20,9 @@ import AddCounselorDialog from "@/components/users/AddCounselorDialog";
 import EditUserDialog from "@/components/users/EditUserDialog";
 import ViewUserDetailsDialog from "@/components/users/ViewUserDetailsDialog";
 import UserManagementTable from "@/components/users/UserManagementTable";
+import { usersService } from "@/services/users.service";
+import { studentsService } from "@/services/students.service";
+import { counselorsService } from "@/services/counselors.service";
 
 export default function UserManagementPage() {
   const [activeTab, setActiveTab] = useState("students");
@@ -32,154 +36,100 @@ export default function UserManagementPage() {
   const [userToEdit, setUserToEdit] = useState(null);
   const [userToView, setUserToView] = useState(null);
 
-  // Mock data - replace with actual API calls
-  const [students, setStudents] = useState([
-    {
-      id: "1",
-      name: "Ahmad Ali",
-      email: "ahmad.ali@student.buitems.edu.pk",
-      phone: "+92 300 1234567",
-      role: "student",
-      cmsId: "CS-2024-001",
-      department: "Computer Science",
-      batch: "Fall 2021",
-      currentSemester: "6th Semester",
-      cgpa: 3.85,
-      enrollmentDate: "2021-09-01",
-      isActive: true,
-      createdAt: "2021-09-01T00:00:00Z",
-      updatedAt: "2024-06-20T10:00:00Z",
-      lastLogin: "2024-06-20T14:30:00Z",
-      address: "House 123, Street 45, Quetta",
-      assignedCounselor: "Dr. Sarah Ahmed",
-      emergencyContact: {
-        name: "Muhammad Ali",
-        phone: "+92 300 9876543",
-        relationship: "Father",
-      },
-    },
-    {
-      id: "2",
-      name: "Fatima Khan",
-      email: "fatima.khan@student.buitems.edu.pk",
-      phone: "+92 301 2345678",
-      role: "student",
-      cmsId: "EE-2024-015",
-      department: "Electrical Engineering",
-      batch: "Spring 2022",
-      currentSemester: "4th Semester",
-      cgpa: 3.92,
-      enrollmentDate: "2022-02-01",
-      isActive: true,
-      createdAt: "2022-02-01T00:00:00Z",
-      updatedAt: "2024-06-18T10:00:00Z",
-      lastLogin: "2024-06-18T16:20:00Z",
-      address: "House 456, Street 78, Quetta",
-      assignedCounselor: "Prof. Ahmad Hassan",
-    },
-    {
-      id: "3",
-      name: "Hassan Ahmed",
-      email: "hassan.ahmed@student.buitems.edu.pk",
-      phone: "+92 302 3456789",
-      role: "student",
-      cmsId: "ME-2024-032",
-      department: "Mechanical Engineering",
-      batch: "Fall 2020",
-      currentSemester: "8th Semester",
-      cgpa: 2.95,
-      enrollmentDate: "2020-09-01",
-      isActive: false,
-      createdAt: "2020-09-01T00:00:00Z",
-      updatedAt: "2024-06-15T10:00:00Z",
-      lastLogin: "2024-06-10T12:15:00Z",
-      address: "House 789, Street 90, Quetta",
-    },
-  ]);
+  const queryClient = useQueryClient();
 
-  const [counselors, setCounselors] = useState([
-    {
-      id: "100",
-      name: "Dr. Sarah Ahmed",
-      email: "sarah.ahmed@buitems.edu.pk",
-      phone: "+92 302 1234567",
-      role: "counselor",
-      employeeId: "EMP-2020-045",
-      department: "Psychology Department",
-      specialization: ["Academic Counseling", "Career Guidance"],
-      officeLocation: "Room 201, Counseling Center",
-      officeHours: "Mon-Fri: 9:00 AM - 5:00 PM",
-      yearsOfExperience: 8,
-      maxStudentsCapacity: 40,
-      currentStudentsCount: 28,
-      isActive: true,
-      createdAt: "2020-08-15T00:00:00Z",
-      updatedAt: "2024-06-20T10:00:00Z",
-      lastLogin: "2024-06-20T08:30:00Z",
-      address: "House 789, Street 12, Quetta",
+  // Fetch students using React Query
+  const {
+    data: students = [],
+    isLoading: isLoadingStudents,
+    error: studentsError
+  } = useQuery({
+    queryKey: ['users', 'students'],
+    queryFn: () => usersService.getUsers({ role: 'student' }),
+    onError: (error) => {
+      toast.error(`Failed to load students: ${error.message}`);
+    }
+  });
+
+  // Fetch counselors using React Query
+  const {
+    data: counselors = [],
+    isLoading: isLoadingCounselors,
+    error: counselorsError
+  } = useQuery({
+    queryKey: ['users', 'counselors'],
+    queryFn: () => usersService.getUsers({ role: 'counselor' }),
+    onError: (error) => {
+      toast.error(`Failed to load counselors: ${error.message}`);
+    }
+  });
+
+  // Create student mutation
+  const createStudentMutation = useMutation({
+    mutationFn: (studentData) => usersService.createStudent(studentData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users', 'students'] });
+      toast.success("Student added successfully!");
+      setIsAddStudentDialogOpen(false);
     },
-    {
-      id: "101",
-      name: "Prof. Ahmad Hassan",
-      email: "ahmad.hassan@buitems.edu.pk",
-      phone: "+92 303 2345678",
-      role: "counselor",
-      employeeId: "EMP-2019-032",
-      department: "Academic Affairs",
-      specialization: ["Academic Planning", "Study Skills"],
-      officeLocation: "Room 105, Student Services",
-      officeHours: "Mon-Thu: 10:00 AM - 4:00 PM",
-      yearsOfExperience: 12,
-      maxStudentsCapacity: 35,
-      currentStudentsCount: 22,
-      isActive: false,
-      createdAt: "2019-07-20T00:00:00Z",
-      updatedAt: "2024-06-15T10:00:00Z",
-      lastLogin: "2024-06-10T15:45:00Z",
-      address: "House 321, Street 67, Quetta",
+    onError: (error) => {
+      toast.error(`Failed to add student: ${error.message}`);
+    }
+  });
+
+  // Create counselor mutation
+  const createCounselorMutation = useMutation({
+    mutationFn: (counselorData) => usersService.createCounselor(counselorData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users', 'counselors'] });
+      toast.success("Counselor added successfully!");
+      setIsAddCounselorDialogOpen(false);
     },
-  ]);
+    onError: (error) => {
+      toast.error(`Failed to add counselor: ${error.message}`);
+    }
+  });
 
   const handleAddStudent = async (studentData) => {
     try {
-      const newStudent = {
-        id: Date.now().toString(),
+      createStudentMutation.mutate({
         ...studentData,
         role: "student",
         cgpa: 0,
         enrollmentDate: new Date().toISOString().split("T")[0],
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      setStudents((prev) => [newStudent, ...prev]);
-      toast.success("Student added successfully!");
+        isActive: true
+      });
     } catch (error) {
-      toast.error("Failed to add student. Please try again.");
-      throw error;
+      console.error("Error adding student:", error);
     }
   };
 
   const handleAddCounselor = async (counselorData) => {
     try {
-      const newCounselor = {
-        id: Date.now().toString(),
+      createCounselorMutation.mutate({
         ...counselorData,
         role: "counselor",
         currentStudentsCount: 0,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      setCounselors((prev) => [newCounselor, ...prev]);
-      toast.success("Counselor added successfully!");
+        isActive: true
+      });
     } catch (error) {
-      toast.error("Failed to add counselor. Please try again.");
-      throw error;
+      console.error("Error adding counselor:", error);
     }
   };
+
+  // Update user mutation
+  const updateUserMutation = useMutation({
+    mutationFn: ({ userId, userData }) => usersService.updateUser(userId, userData),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success(`${data.role === "student" ? "Student" : "Counselor"} updated successfully!`);
+      setIsEditDialogOpen(false);
+      setUserToEdit(null);
+    },
+    onError: (error) => {
+      toast.error(`Failed to update user: ${error.message}`);
+    }
+  });
 
   const handleEditUser = (user) => {
     setUserToEdit(user);
@@ -190,33 +140,59 @@ export default function UserManagementPage() {
     if (!userToEdit) return;
 
     try {
-      const updatedUser = {
-        ...userToEdit,
-        ...userData,
-        updatedAt: new Date().toISOString(),
-      };
-
-      if (userToEdit.role === "student") {
-        setStudents((prev) =>
-          prev.map((s) => (s.id === userToEdit.id ? updatedUser : s))
-        );
-      } else {
-        setCounselors((prev) =>
-          prev.map((c) => (c.id === userToEdit.id ? updatedUser : c))
-        );
-      }
-
-      toast.success(
-        `${
-          userToEdit.role === "student" ? "Student" : "Counselor"
-        } updated successfully!`
-      );
-      setUserToEdit(null);
+      updateUserMutation.mutate({
+        userId: userToEdit.id,
+        userData: {
+          ...userData,
+          role: userToEdit.role
+        }
+      });
     } catch (error) {
-      toast.error("Failed to update user. Please try again.");
-      throw error;
+      console.error("Error updating user:", error);
     }
   };
+
+  // Delete user mutation
+  const deleteUserMutation = useMutation({
+    mutationFn: (userId) => usersService.deleteUser(userId),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      const userType = userToDelete?.role === "student" ? "Student" : "Counselor";
+      toast.success(`${userType} deleted successfully`);
+      setIsDeleteDialogOpen(false);
+      setUserToDelete(null);
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete user: ${error.message}`);
+    }
+  });
+
+  // Toggle user status mutation
+  const toggleUserStatusMutation = useMutation({
+    mutationFn: (userId) => usersService.toggleUserStatus(userId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      const userType = data.role === "student" ? "Student" : "Counselor";
+      const statusText = data.isActive ? "activated" : "blocked";
+      toast.success(`${userType} ${statusText} successfully`);
+    },
+    onError: (error) => {
+      toast.error(`Failed to update user status: ${error.message}`);
+    }
+  });
+
+  // Assign counselor mutation
+  const assignCounselorMutation = useMutation({
+    mutationFn: ({ studentId, counselorId }) =>
+      usersService.assignCounselorToStudent(studentId, counselorId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success(data.message || "Counselor assignment updated successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to assign counselor: ${error.message}`);
+    }
+  });
 
   const handleDeleteUser = (user) => {
     setUserToDelete(user);
@@ -226,45 +202,32 @@ export default function UserManagementPage() {
   const confirmDeleteUser = () => {
     if (!userToDelete) return;
 
-    if (userToDelete.role === "student") {
-      setStudents((prev) => prev.filter((s) => s.id !== userToDelete.id));
-    } else {
-      setCounselors((prev) => prev.filter((c) => c.id !== userToDelete.id));
+    try {
+      deleteUserMutation.mutate(userToDelete.id);
+    } catch (error) {
+      console.error("Error deleting user:", error);
     }
-
-    toast.success(
-      `${
-        userToDelete.role === "student" ? "Student" : "Counselor"
-      } deleted successfully`
-    );
-    setIsDeleteDialogOpen(false);
-    setUserToDelete(null);
   };
 
   const handleToggleUserStatus = (user) => {
-    const updateUser = (prev) =>
-      prev.map((u) =>
-        u.id === user.id
-          ? { ...u, isActive: !u.isActive, updatedAt: new Date().toISOString() }
-          : u
-      );
-
-    if (user.role === "student") {
-      setStudents(updateUser);
-    } else {
-      setCounselors(updateUser);
+    try {
+      toggleUserStatusMutation.mutate(user.id);
+    } catch (error) {
+      console.error("Error toggling user status:", error);
     }
-
-    toast.success(
-      `${user.role === "student" ? "Student" : "Counselor"} ${
-        user.isActive ? "blocked" : "activated"
-      } successfully`
-    );
   };
 
   const handleViewUserDetails = (user) => {
     setUserToView(user);
     setIsViewDetailsDialogOpen(true);
+  };
+
+  const handleAssignCounselor = async (studentId, counselorId) => {
+    try {
+      assignCounselorMutation.mutate({ studentId, counselorId });
+    } catch (error) {
+      console.error("Error assigning counselor:", error);
+    }
   };
 
   const getStats = () => {
@@ -284,6 +247,41 @@ export default function UserManagementPage() {
   };
 
   const stats = getStats();
+
+  // Handle loading state
+  if (isLoadingStudents || isLoadingCounselors) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading user management data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle error state
+  if (studentsError || counselorsError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Error Loading Users</h2>
+          <p className="text-gray-600 mb-4">
+            {studentsError?.message || counselorsError?.message || "Failed to load user data. Please try again."}
+          </p>
+          <Button
+            onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ['users'] });
+            }}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

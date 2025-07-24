@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 
 export default function HeroSection() {
   return (
@@ -16,12 +17,14 @@ export default function HeroSection() {
           sharing.
         </p>
         
+        <Link to='/dashboard'>
         <Button 
           size="lg" 
           className="bg-white text-[#0056b3] hover:bg-blue-50 font-semibold px-8 py-3 text-lg rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl"
         >
           Access Platform
         </Button>
+        </Link>
       </div>
     </section>
   );

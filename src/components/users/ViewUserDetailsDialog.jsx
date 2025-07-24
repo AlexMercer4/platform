@@ -20,6 +20,10 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export default function ViewUserDetailsDialog({ open, onOpenChange, user }) {
   if (!user) return null;
+  
+  // For now, just use the provided user data directly
+  // TODO: Implement detailed fetching later if needed
+  const displayUser = user;
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -64,7 +68,7 @@ export default function ViewUserDetailsDialog({ open, onOpenChange, user }) {
                       {user.isActive ? "Active" : "Inactive"}
                     </Badge>
                     <span className="text-blue-100">
-                      {user.role === "student" ? user.cmsId : user.employeeId}
+                      {user.role === "student" ? user.studentId : user.employeeId}
                     </span>
                     <span className="text-blue-100">• {user.department}</span>
                   </div>
@@ -252,7 +256,7 @@ export default function ViewUserDetailsDialog({ open, onOpenChange, user }) {
             </Card>
 
             {/* Emergency Contact (for students) */}
-            {user.role === "student" && user.emergencyContact && (
+            {user.role === "student" && (user.emergencyContactName || user.emergencyContactPhone || user.emergencyContactRelationship) && (
               <Card className="lg:col-span-2">
                 <CardContent className="p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
@@ -261,26 +265,32 @@ export default function ViewUserDetailsDialog({ open, onOpenChange, user }) {
                   </h3>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <p className="text-sm text-gray-500">Name</p>
-                      <p className="text-gray-900">
-                        {user.emergencyContact?.name}
-                      </p>
-                    </div>
+                    {user.emergencyContactName && (
+                      <div>
+                        <p className="text-sm text-gray-500">Name</p>
+                        <p className="text-gray-900">
+                          {user.emergencyContactName}
+                        </p>
+                      </div>
+                    )}
 
-                    <div>
-                      <p className="text-sm text-gray-500">Phone</p>
-                      <p className="text-gray-900">
-                        {user.emergencyContact?.phone}
-                      </p>
-                    </div>
+                    {user.emergencyContactPhone && (
+                      <div>
+                        <p className="text-sm text-gray-500">Phone</p>
+                        <p className="text-gray-900">
+                          {user.emergencyContactPhone}
+                        </p>
+                      </div>
+                    )}
 
-                    <div>
-                      <p className="text-sm text-gray-500">Relationship</p>
-                      <p className="text-gray-900">
-                        {user.emergencyContact?.relationship}
-                      </p>
-                    </div>
+                    {user.emergencyContactRelationship && (
+                      <div>
+                        <p className="text-sm text-gray-500">Relationship</p>
+                        <p className="text-gray-900">
+                          {user.emergencyContactRelationship}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

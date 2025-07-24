@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Header from "./components/layout/Header";
 import "./App.css";
@@ -17,6 +18,7 @@ import StudentsPage from "@/pages/StudentsPage";
 import StudentNotesPage from "@/pages/StudentNotesPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
 import UserManagementPage from "@/pages/UserManagementPage";
+import NotificationsPage from "@/pages/NotificationsPage";
 
 // Role-based route components
 const RoleBasedRoute = ({ roles, children }) => {
@@ -30,9 +32,10 @@ function App() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+      <NotificationProvider>
+        <Header />
 
-      <Routes>
+        <Routes>
         {/* Public routes */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
@@ -99,6 +102,8 @@ function App() {
 
           <Route path="/profile" element={<ProfilePage />} />
 
+          <Route path="/notifications" element={<NotificationsPage />} />
+
           <Route
             path="/user-management"
             element={
@@ -127,6 +132,7 @@ function App() {
       </Routes>
 
       <Toaster />
+      </NotificationProvider>
     </div>
   );
 }

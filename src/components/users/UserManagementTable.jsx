@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Edit,
   Trash2,
@@ -6,6 +7,7 @@ import {
   CheckCircle,
   Eye,
   MoreVertical,
+  UserCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +34,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import { counselorsService } from "@/services/counselors.service";
+import { toast } from "sonner";
+
 export default function UserManagementTable({
   users,
   userType,
@@ -39,11 +44,22 @@ export default function UserManagementTable({
   onDelete,
   onToggleStatus,
   onViewDetails,
+  onAssignCounselor,
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [batchFilter, setBatchFilter] = useState("all");
+
+  // Fetch counselors for assignment dropdown (only for students table)
+  const { data: counselors = [] } = useQuery({
+    queryKey: ['counselors-for-assignment'],
+    queryFn: () => counselorsService.getCounselors(),
+    enabled: userType === "student",
+    onError: (error) => {
+      toast.error(`Failed to load counselors: ${error.message}`);
+    }
+  });
 
   const departments = Array.from(new Set(users.map((user) => user.department)));
   const batches =
@@ -56,9 +72,9 @@ export default function UserManagementTable({
       user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (userType === "student" &&
-        user.cmsId.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        user.studentId?.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (userType === "counselor" &&
-        user.employeeId.toLowerCase().includes(searchQuery.toLowerCase()));
+        user.employeeId?.toLowerCase().includes(searchQuery.toLowerCase()));
 
     const matchesDepartment =
       departmentFilter === "all" || user.department === departmentFilter;
@@ -178,7 +194,7 @@ export default function UserManagementTable({
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">{user.name}</TableCell>
                   <TableCell>
-                    {userType === "student" ? user.cmsId : user.employeeId}
+                    {userType === "student" ? user.studentId : user.employeeId}
                   </TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>{user.department}</TableCell>

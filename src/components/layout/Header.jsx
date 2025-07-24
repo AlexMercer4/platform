@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Bell, User, Menu, X, GraduationCap } from "lucide-react";
+import { User, Menu, X, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -9,14 +9,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
+import NotificationBell from "@/components/notifications/NotificationBell";
 
 const ROLE_LINKS = {
   student: ["Dashboard", "Appointments", "Messages", "Profile"],
   counselor: [
     "Dashboard",
     "Appointments",
-    "Students",
     "Messages",
+    "Students",
     "Analytics",
     "Profile",
   ],
@@ -65,16 +66,7 @@ export default function Header() {
           <div className="flex items-center gap-2 md:gap-4 shrink-0">
             {!isUnauthenticated && (
               <>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-white hover:bg-white/10 relative p-2"
-                >
-                  <Bell className="h-5 w-5" />
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                    3
-                  </span>
-                </Button>
+                <NotificationBell />
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -92,8 +84,6 @@ export default function Header() {
                     <DropdownMenuItem asChild>
                       <Link to="/profile">Profile Settings</Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem>Account</DropdownMenuItem>
-                    <DropdownMenuItem>Help & Support</DropdownMenuItem>
                     <DropdownMenuItem onClick={logout} className="text-red-600">
                       Logout
                     </DropdownMenuItem>

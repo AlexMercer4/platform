@@ -1,4 +1,4 @@
-import { User } from "lucide-react";
+import { User, Briefcase, GraduationCap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export default function ConversationItem({
@@ -7,11 +7,11 @@ export default function ConversationItem({
   onClick,
   currentUserId,
 }) {
-  const otherParticipant = conversation.participants.find(
-    (p) => p.id !== currentUserId
-  );
+  const otherUser = conversation.otherUser;
 
   const formatTime = (timestamp) => {
+    if (!timestamp) return "";
+    
     const date = new Date(timestamp);
     const now = new Date();
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
@@ -33,38 +33,79 @@ export default function ConversationItem({
     }
   };
 
+  // Get the appropriate icon based on user role
+  const getUserIcon = () => {
+    if (!otherUser) return <User className="h-5 w-5 text-gray-600" />;
+    
+    switch (otherUser.role) {
+      case 'student':
+        return <GraduationCap className="h-5 w-5 text-blue-600" />;
+      case 'counselor':
+        return <Briefcase className="h-5 w-5 text-green-600" />;
+      default:
+        return <User className="h-5 w-5 text-gray-600" />;
+    }
+  };
+
+  // Get additional user info based on role
+  const getUserInfo = () => {
+    if (!otherUser) return null;
+    
+    if (otherUser.role === 'student' && otherUser.studentId) {
+      return (
+        <span className="text-xs text-gray-500">
+          ID: {otherUser.studentId}
+        </span>
+      );
+    } else if (otherUser.role === 'counselor' && otherUser.department) {
+      return (
+        <span className="text-xs text-gray-500">
+          {otherUser.department}
+        </span>
+      );
+    }
+    return null;
+  };
+
   return (
     <div
       onClick={onClick}
-      className={`p-4 cursor-pointer border-b border-gray-100 hover:bg-gray-50 transition-colors duration-200 ${
+      className={`p-3 md:p-4 cursor-pointer border-b border-gray-100 hover:bg-gray-50 transition-colors duration-200 ${
         isActive ? "bg-blue-50 border-l-4 border-l-[#0056b3]" : ""
       }`}
     >
-      <div className="flex items-start space-x-3">
+      <div className="flex items-start space-x-2 md:space-x-3">
         <div className="relative">
-          <div className="bg-gray-200 p-2 rounded-full">
-            <User className="h-5 w-5 text-gray-600" />
+          <div className={`p-1.5 md:p-2 rounded-full ${
+            otherUser?.role === 'student' ? 'bg-blue-100' : 
+            otherUser?.role === 'counselor' ? 'bg-green-100' : 'bg-gray-200'
+          }`}>
+            {getUserIcon()}
           </div>
-          {otherParticipant?.isOnline && (
-            <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-          )}
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between mb-1">
-            <h3
-              className={`text-sm font-medium truncate ${
-                conversation.unreadCount > 0 ? "text-gray-900" : "text-gray-700"
-              }`}
-            >
-              {otherParticipant?.name || "Unknown User"}
-            </h3>
-            <div className="flex items-center space-x-2">
-              <span className="text-xs text-gray-500">
-                {formatTime(conversation.lastMessage.timestamp)}
-              </span>
+          <div className="flex items-center justify-between mb-0.5 md:mb-1">
+            <div className="max-w-[60%]">
+              <h3
+                className={`text-xs md:text-sm font-medium truncate ${
+                  conversation.unreadCount > 0 ? "text-gray-900" : "text-gray-700"
+                }`}
+              >
+                {otherUser?.name || "Unknown User"}
+              </h3>
+              <div className="hidden md:block">
+                {getUserInfo()}
+              </div>
+            </div>
+            <div className="flex items-center space-x-1 md:space-x-2">
+              {conversation.lastMessage && (
+                <span className="text-[10px] md:text-xs text-gray-500">
+                  {formatTime(conversation.lastMessage.createdAt)}
+                </span>
+              )}
               {conversation.unreadCount > 0 && (
-                <Badge className="bg-[#0056b3] text-white text-xs px-2 py-1 rounded-full">
+                <Badge className="bg-[#0056b3] text-white text-[10px] md:text-xs px-1.5 md:px-2 py-0.5 md:py-1 rounded-full">
                   {conversation.unreadCount}
                 </Badge>
               )}
@@ -72,15 +113,19 @@ export default function ConversationItem({
           </div>
 
           <p
-            className={`text-sm truncate ${
+            className={`text-xs md:text-sm truncate ${
               conversation.unreadCount > 0
                 ? "text-gray-900 font-medium"
                 : "text-gray-500"
             }`}
           >
-            {conversation.lastMessage.attachment
-              ? `📎 ${conversation.lastMessage.attachment.name}`
-              : conversation.lastMessage.content}
+            {conversation.lastMessage ? (
+              conversation.lastMessage.attachment
+                ? `📎 Attachment`
+                : conversation.lastMessage.content
+            ) : (
+              "No messages yet"
+            )}
           </p>
         </div>
       </div>

@@ -1,295 +1,92 @@
-import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
-import { MessageCircle, FolderOpen } from "lucide-react";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import {
+  BarChart3,
+  PieChart,
+  AlertCircle,
+  Loader2
+} from "lucide-react";
 import { toast } from "sonner";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import ConversationList from "@/components/messages/ConversationList";
-import ChatWindow from "@/components/messages/ChatWindow";
-import ResourcesPanel from "@/components/messages/ResourcesPanel";
 import { useAuth } from "@/contexts/AuthContext";
+import { dashboardService } from "@/services/dashboard.service";
+import { appointmentsService } from "@/services/appointments.service";
 
-export default function MessagesPage() {
-  const [searchParams] = useSearchParams();
-  const currentUserId = "1"; // Mock current user ID
+export default function ChairpersonDashboard() {
   const { user } = useAuth();
-  const userRole = user?.role;
-  const [activeTab, setActiveTab] = useState("messages");
+  const [statsTimeframe, setStatsTimeframe] = useState("week"); // "week", "month", "semester"
 
-  // Mock users data
-  const users = [
-    {
-      id: "1",
-      name: "Ahmad Ali",
-      email: "ahmad.ali@student.edu",
-      role: "student",
-      isOnline: true,
-    },
-    {
-      id: "2",
-      name: "Dr. Sarah Ahmed",
-      email: "sarah@university.edu",
-      role: "counselor",
-      isOnline: true,
-    },
-    {
-      id: "3",
-      name: "Prof. Ahmad Hassan",
-      email: "ahmad@university.edu",
-      role: "counselor",
-      isOnline: false,
-    },
-    {
-      id: "4",
-      name: "Dr. Fatima Sheikh",
-      email: "fatima@university.edu",
-      role: "counselor",
-      isOnline: true,
-    },
-  ];
+  // Fetch dashboard stats
+  const {
+    data: stats,
+    isLoading: isLoadingStats,
+    error: statsError
+  } = useQuery({
+    queryKey: ['dashboardStats'],
+    queryFn: dashboardService.getDashboardStats,
+    onError: (error) => {
+      toast.error(`Failed to load dashboard statistics: ${error.message}`);
+    }
+  });
 
-  const statsLoading = false;
+  // Fetch recent appointments
+  const {
+    data: recentAppointments = [],
+    isLoading: isLoadingAppointments,
+    error: appointmentsError
+  } = useQuery({
+    queryKey: ['recentAppointments', statsTimeframe],
+    queryFn: () => appointmentsService.getAppointments({
+      timeframe: statsTimeframe,
+      limit: 5
+    }),
+    onError: (error) => {
+      toast.error(`Failed to load appointments: ${error.message}`);
+    }
+  });
 
-  if (statsLoading) {
+  // Calculate appointment distribution by type
+  const appointmentsByType = recentAppointments.reduce((acc, appointment) => {
+    acc[appointment.type] = (acc[appointment.type] || 0) + 1;
+    return acc;
+  }, {});
+
+  // Calculate appointment distribution by status
+  const appointmentsByStatus = recentAppointments.reduce((acc, appointment) => {
+    acc[appointment.status] = (acc[appointment.status] || 0) + 1;
+    return acc;
+  }, {});
+
+  if (isLoadingStats && isLoadingAppointments) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0056b3]"></div>
-          </div>
-        </main>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
       </div>
     );
   }
 
-  const mockAttachment = {
-    id: "1",
-    name: "Academic_Planning_Guide_2024.pdf",
-    size: "2.1 MB",
-    type: "application/pdf",
-    url: "/files/academic-planning-guide.pdf",
-  };
-
-  // Mock shared resources data
-  const [sharedResources] = useState([
-    {
-      id: "1",
-      name: "Academic_Planning_Guide_2024.pdf",
-      size: "2.1 MB",
-      type: "application/pdf",
-      url: "/files/academic-planning-guide.pdf",
-      uploadedAt: "2024-06-20T15:02:00Z",
-      uploadedBy: "Dr. Sarah Ahmed",
-      sharedWith: ["Ahmad Ali"],
-      description: "Comprehensive guide for academic planning and course selection",
-    },
-    {
-      id: "2",
-      name: "Career_Opportunities_CS_2024.docx",
-      size: "1.8 MB",
-      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      url: "/files/career-opportunities-cs.docx",
-      uploadedAt: "2024-06-18T14:30:00Z",
-      uploadedBy: "Prof. Ahmad Hassan",
-      sharedWith: ["Ahmad Ali"],
-      description: "Career opportunities in Computer Science",
-    },
-  ]);
-
-  // Mock messages data
-  const [messages] = useState([
-    {
-      id: "1",
-      senderId: "2",
-      receiverId: "1",
-      content:
-        "Hi Ahmad! I hope you're doing well. Just a reminder about our meeting tomorrow at 10 AM.",
-      timestamp: "2024-06-20T14:30:00Z",
-      isRead: true,
-    },
-    {
-      id: "2",
-      senderId: "1",
-      receiverId: "2",
-      content:
-        "Hello Dr. Ahmed! Yes, I'll be there. Should I bring anything specific?",
-      timestamp: "2024-06-20T14:45:00Z",
-      isRead: true,
-    },
-    {
-      id: "3",
-      senderId: "2",
-      receiverId: "1",
-      content:
-        "Please bring your academic transcript and any questions about your course selection for next semester.",
-      timestamp: "2024-06-20T15:00:00Z",
-      isRead: true,
-    },
-    {
-      id: "4",
-      senderId: "2",
-      receiverId: "1",
-      content: "Here's the academic planning guide I mentioned:",
-      timestamp: "2024-06-20T15:02:00Z",
-      isRead: true,
-      attachment: mockAttachment,
-    },
-    {
-      id: "5",
-      senderId: "1",
-      receiverId: "2",
-      content: "Perfect! I have both ready. See you tomorrow!",
-      timestamp: "2024-06-20T15:05:00Z",
-      isRead: true,
-    },
-  ]);
-
-  // Mock conversations data
-  const [conversations, setConversations] = useState([
-    {
-      id: "1",
-      participants: [users[0], users[1]], // Ahmad Ali & Dr. Sarah Ahmed
-      lastMessage: messages[4],
-      unreadCount: 0,
-      updatedAt: "2024-06-20T15:05:00Z",
-    },
-    {
-      id: "2",
-      participants: [users[0], users[2]], // Ahmad Ali & Prof. Ahmad Hassan
-      lastMessage: {
-        id: "6",
-        senderId: "3",
-        receiverId: "1",
-        content:
-          "I have approved your course selection. Check the resources section for additional materials.",
-        timestamp: "2024-06-19T10:00:00Z",
-        isRead: false,
-      },
-      unreadCount: 1,
-      updatedAt: "2024-06-19T10:00:00Z",
-    },
-    {
-      id: "3",
-      participants: [users[0], users[3]], // Ahmad Ali & Dr. Fatima Sheikh
-      lastMessage: {
-        id: "7",
-        senderId: "4",
-        receiverId: "1",
-        content:
-          "Thank you for the session today. Here are the action items we discussed...",
-        timestamp: "2024-06-17T16:30:00Z",
-        isRead: false,
-      },
-      unreadCount: 1,
-      updatedAt: "2024-06-17T16:30:00Z",
-    },
-  ]);
-
-  const [activeConversationId, setActiveConversationId] = useState("1");
-
-  // Check for userId in URL params and start conversation if needed
-  useEffect(() => {
-    const userId = searchParams.get("userId");
-    if (userId) {
-      handleStartConversation(userId);
-    }
-  }, [searchParams]);
-
-  const activeConversation = conversations.find(
-    (c) => c.id === activeConversationId
-  );
-  const conversationMessages = activeConversationId
-    ? messages.filter(
-        (m) =>
-          (m.senderId === currentUserId &&
-            m.receiverId ===
-              activeConversation?.participants.find(
-                (p) => p.id !== currentUserId
-              )?.id) ||
-          (m.receiverId === currentUserId &&
-            m.senderId ===
-              activeConversation?.participants.find(
-                (p) => p.id !== currentUserId
-              )?.id)
-      )
-    : [];
-
-  const handleSendMessage = (content, file) => {
-    if (!activeConversationId) return;
-
-    // In a real app, this would send the message to the server
-    console.log("Sending message:", {
-      content,
-      file,
-      conversationId: activeConversationId,
-    });
-
-    // Mock success feedback
-    if (file) {
-      console.log("File attached:", file.name);
-    }
-  };
-
-  const handleStartConversation = async (userId) => {
-    try {
-      // Find the user to start conversation with
-      const targetUser = [...users].find((u) => u.id === userId);
-      if (!targetUser) {
-        toast.error("User not found");
-        return;
-      }
-
-      // Check if conversation already exists
-      const existingConversation = conversations.find((conv) =>
-        conv.participants.some((p) => p.id === userId)
-      );
-
-      if (existingConversation) {
-        setActiveConversationId(existingConversation.id);
-        toast.info(`Opened conversation with ${targetUser.name}`);
-        return;
-      }
-
-      // Create new conversation
-      const newConversation = {
-        id: Date.now().toString(),
-        participants: [users.find((u) => u.id === currentUserId), targetUser],
-        lastMessage: {
-          id: Date.now().toString(),
-          senderId: currentUserId,
-          receiverId: userId,
-          content: "Conversation started",
-          timestamp: new Date().toISOString(),
-          isRead: false,
-        },
-        unreadCount: 0,
-        updatedAt: new Date().toISOString(),
-      };
-
-      setConversations((prev) => [newConversation, ...prev]);
-      setActiveConversationId(newConversation.id);
-      toast.success(`Started conversation with ${targetUser.name}`);
-    } catch (error) {
-      toast.error("Failed to start conversation");
-      throw error;
-    }
-  };
-
-  // Check if user can access messaging
-  if (userRole === "chairperson") {
+  if (statsError || appointmentsError) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center py-12">
-            <MessageCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Messages Not Available
-            </h2>
-            <p className="text-gray-600">
-              Chairpersons do not have access to direct messaging. Please use
-              the reporting and analytics features instead.
-            </p>
-          </div>
-        </main>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Error Loading Dashboard</h2>
+          <p className="text-gray-600 mb-4">
+            {statsError?.message || appointmentsError?.message || "Failed to load dashboard data. Please try again."}
+          </p>
+          <Button
+            onClick={() => window.location.reload()}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            Retry
+          </Button>
+        </div>
       </div>
     );
   }
@@ -297,52 +94,321 @@ export default function MessagesPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header Section */}
+        {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">
-            Messages & Resources
+            Welcome back, {user?.name || "Chairperson"}
           </h1>
           <p className="text-gray-600 mt-2">
-            Communicate with your{" "}
-            {userRole === "student" ? "counselors" : "students"} and share
-            resources in real-time.
+            Here's an overview of the counseling department's performance and statistics.
           </p>
         </div>
 
-        {/* Messages Interface */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-[calc(100vh-200px)] flex">
-          {/* Conversation List */}
-          <ConversationList
-            conversations={conversations}
-            activeConversationId={activeConversationId}
-            onConversationSelect={setActiveConversationId}
-            currentUserId={currentUserId}
-            userRole={userRole}
-            onStartConversation={handleStartConversation}
-          />
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">
+                Total Students
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-baseline">
+                <div className="text-3xl font-bold text-gray-900">
+                  {isLoadingStats ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                  ) : (
+                    stats?.totalStudents || 0
+                  )}
+                </div>
+              </div>
 
-          {/* Chat Window */}
-          {activeConversation ? (
-            <ChatWindow
-              conversation={activeConversation}
-              messages={conversationMessages}
-              currentUserId={currentUserId}
-              onSendMessage={handleSendMessage}
-            />
-          ) : (
-            <div className="flex-1 flex items-center justify-center bg-gray-50">
-              <div className="text-center">
-                <MessageCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Select a conversation
-                </h3>
-                <p className="text-gray-500">
-                  Choose a conversation from the list to start messaging.
-                </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">
+                Active Students
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-baseline">
+                <div className="text-3xl font-bold text-gray-900">
+                  {isLoadingStats ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                  ) : (
+                    stats?.activeStudents || 0
+                  )}
+                </div>
+                <div className="ml-2 text-sm text-gray-500">
+                  {stats?.totalStudents ?
+                    `(${Math.round((stats.activeStudents / stats.totalStudents) * 100)}%)` :
+                    ''}
+                </div>
+              </div>
+
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">
+                Total Counselors
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-baseline">
+                <div className="text-3xl font-bold text-gray-900">
+                  {isLoadingStats ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                  ) : (
+                    stats?.totalCounselors || 0
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">
+                Active Counselors
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-baseline">
+                <div className="text-3xl font-bold text-gray-900">
+                  {isLoadingStats ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                  ) : (
+                    stats?.activeCounselors || 0
+                  )}
+                </div>
+                <div className="ml-2 text-sm text-gray-500">
+                  {stats?.totalCounselors ?
+                    `(${Math.round((stats.activeCounselors / stats.totalCounselors) * 100)}%)` :
+                    ''}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Department Overview */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Recent Activity */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Department Activity</CardTitle>
+              <CardDescription>
+                Latest counseling activities across the department
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingAppointments ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                </div>
+              ) : recentAppointments.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No recent activity</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {recentAppointments.slice(0, 5).map((appointment, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <p className="font-medium text-gray-900">
+                          {appointment.type} Session
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {appointment.student?.name} with {appointment.counselor?.name}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-gray-900">
+                          {new Date(appointment.date).toLocaleDateString()}
+                        </p>
+                        <p className="text-xs text-gray-500 capitalize">
+                          {appointment.status}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Department Performance */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Department Performance</CardTitle>
+              <CardDescription>
+                Key performance indicators for this {statsTimeframe}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium text-gray-600">Student Engagement</span>
+                    <span className="text-sm text-gray-500">
+                      {stats?.activeStudents || 0} / {stats?.totalStudents || 0}
+                    </span>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {stats?.totalStudents ?
+                      Math.round((stats.activeStudents / stats.totalStudents) * 100) : 0}%
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium text-gray-600">Counselor Utilization</span>
+                    <span className="text-sm text-gray-500">
+                      {stats?.activeCounselors || 0} / {stats?.totalCounselors || 0}
+                    </span>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {stats?.totalCounselors ?
+                      Math.round((stats.activeCounselors / stats.totalCounselors) * 100) : 0}%
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium text-gray-600">Appointment Completion Rate</span>
+                    <span className="text-sm text-gray-500">
+                      {appointmentsByStatus.completed || 0} completed
+                    </span>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {recentAppointments.length ?
+                      Math.round(((appointmentsByStatus.completed || 0) / recentAppointments.length) * 100) : 0}%
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Analytics Section */}
+        <Card className="mb-8">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Counseling Analytics</CardTitle>
+                <CardDescription>
+                  Overview of counseling activities and trends
+                </CardDescription>
+              </div>
+              <div>
+                <Tabs value={statsTimeframe} onValueChange={setStatsTimeframe}>
+                  <TabsList>
+                    <TabsTrigger value="week">Week</TabsTrigger>
+                    <TabsTrigger value="month">Month</TabsTrigger>
+                    <TabsTrigger value="semester">Semester</TabsTrigger>
+                  </TabsList>
+                </Tabs>
               </div>
             </div>
-          )}
-        </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Appointment Types */}
+              <div>
+                <h3 className="text-lg font-medium mb-4 flex items-center">
+                  <PieChart className="h-5 w-5 mr-2 text-blue-600" />
+                  Session Types Distribution
+                </h3>
+                {isLoadingAppointments ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                  </div>
+                ) : Object.keys(appointmentsByType).length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">No session data available</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {Object.entries(appointmentsByType).map(([type, count]) => (
+                      <div key={type} className="flex items-center">
+                        <div className="w-32 text-sm font-medium">{type}</div>
+                        <div className="flex-1 mx-4">
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-blue-600 h-2 rounded-full"
+                              style={{
+                                width: `${Math.round((count / recentAppointments.length) * 100)}%`
+                              }}
+                            ></div>
+                          </div>
+                        </div>
+                        <div className="w-16 text-right text-sm text-gray-500">
+                          {count} ({Math.round((count / recentAppointments.length) * 100)}%)
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Appointment Status */}
+              <div>
+                <h3 className="text-lg font-medium mb-4 flex items-center">
+                  <BarChart3 className="h-5 w-5 mr-2 text-blue-600" />
+                  Session Status Overview
+                </h3>
+                {isLoadingAppointments ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                  </div>
+                ) : Object.keys(appointmentsByStatus).length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">No session data available</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {Object.entries(appointmentsByStatus).map(([status, count]) => (
+                      <div key={status} className="flex items-center">
+                        <div className="w-32 text-sm font-medium capitalize">{status}</div>
+                        <div className="flex-1 mx-4">
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className={`h-2 rounded-full ${status === 'completed' ? 'bg-green-500' :
+                                status === 'scheduled' ? 'bg-blue-500' :
+                                  status === 'pending' ? 'bg-yellow-500' :
+                                    'bg-red-500'
+                                }`}
+                              style={{
+                                width: `${Math.round((count / recentAppointments.length) * 100)}%`
+                              }}
+                            ></div>
+                          </div>
+                        </div>
+                        <div className="w-16 text-right text-sm text-gray-500">
+                          {count} ({Math.round((count / recentAppointments.length) * 100)}%)
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-8 text-center">
+              <Link to="/analytics">
+                <Button>
+                  View Detailed Analytics
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+
       </main>
     </div>
   );

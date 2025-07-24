@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   User,
   GraduationCap,
@@ -26,11 +27,25 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { usersService } from "@/services/users.service";
+import { counselorsService } from "@/services/counselors.service";
 
 export default function EditUserDialog({ open, onOpenChange, user, onSubmit }) {
   const [formData, setFormData] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [newSpecialization, setNewSpecialization] = useState("");
+
+  // Fetch counselors for dropdown (only when editing students)
+  const {
+    data: counselors = [],
+    isLoading: counselorsLoading,
+    error: counselorsError
+  } = useQuery({
+    queryKey: ['counselors-for-assignment'],
+    queryFn: () => counselorsService.getCounselors(),
+    enabled: user?.role === "student" && open,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
   const departments = [
     "Computer Science",
@@ -98,7 +113,7 @@ export default function EditUserDialog({ open, onOpenChange, user, onSubmit }) {
         ...(user.role === "student" && {
           batch: user.batch,
           currentSemester: user.currentSemester,
-          assignedCounselor: user.assignedCounselor || "",
+          assignedCounselorId: user.assignedCounselorId || "unassigned",
           emergencyContact: user.emergencyContact || {
             name: "",
             phone: "",
@@ -158,7 +173,23 @@ export default function EditUserDialog({ open, onOpenChange, user, onSubmit }) {
     setIsLoading(true);
 
     try {
-      await onSubmit(formData);
+      // Prepare form data for submission
+      const submitData = { ...formData };
+
+      // Handle unassigned counselor value
+      if (submitData.assignedCounselorId === "unassigned") {
+        submitData.assignedCounselorId = null;
+      }
+
+      // Handle emergency contact for students
+      if (user.role === "student" && formData.emergencyContact) {
+        submitData.emergencyContactName = formData.emergencyContact.name;
+        submitData.emergencyContactPhone = formData.emergencyContact.phone;
+        submitData.emergencyContactRelationship = formData.emergencyContact.relationship;
+        delete submitData.emergencyContact;
+      }
+
+      await onSubmit(submitData);
       onOpenChange(false);
     } catch (error) {
       console.error("Error updating user:", error);
@@ -327,14 +358,57 @@ export default function EditUserDialog({ open, onOpenChange, user, onSubmit }) {
 
                 <div className="space-y-2">
                   <Label htmlFor="assignedCounselor">Assigned Counselor</Label>
-                  <Input
-                    id="assignedCounselor"
-                    value={formData.assignedCounselor || ""}
-                    onChange={(e) =>
-                      handleInputChange("assignedCounselor", e.target.value)
-                    }
-                    placeholder="Counselor name"
-                  />
+                  {counselorsLoading ? (
+                    <div className="flex items-center space-x-2 p-2 border rounded-md">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#0056b3]"></div>
+                      <span className="text-sm text-gray-500">Loading counselors...</span>
+                    </div>
+                  ) : counselorsError ? (
+                    <div className="space-y-2">
+                      <div className="p-2 border border-red-200 rounded-md bg-red-50">
+                        <span className="text-sm text-red-600">Failed to load counselors</span>
+                      </div>
+                      <Input
+                        id="assignedCounselor"
+                        value={formData.assignedCounselorId || ""}
+                        onChange={(e) =>
+                          handleInputChange("assignedCounselorId", e.target.value)
+                        }
+                        placeholder="Enter counselor name manually"
+                      />
+                    </div>
+                  ) : (
+                    <Select
+                      value={formData.assignedCounselorId || ""}
+                      onValueChange={(value) =>
+                        handleInputChange("assignedCounselorId", value)
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a counselor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">
+                          <span className="text-gray-500">No counselor assigned</span>
+                        </SelectItem>
+                        {(counselors || [])
+                          .filter(counselor => counselor.isActive)
+                          .map((counselor) => (
+                            <SelectItem key={counselor.id} value={counselor.id}>
+                              <div className="flex flex-col">
+                                <span className="font-medium">{counselor.name}</span>
+                                <span className="text-xs text-gray-500">
+                                  {counselor.department}
+                                  {counselor.specialization && counselor.specialization.length > 0 &&
+                                    ` • ${counselor.specialization[0]}`
+                                  }
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               </div>
 

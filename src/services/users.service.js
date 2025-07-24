@@ -4,7 +4,7 @@ export const usersService = {
   // Get all users with filters (Chairperson only)
   getUsers: async (filters = {}) => {
     const response = await axiosInstance.get('/users', { params: filters });
-    return response.data;
+    return response.data.data || response.data; // Handle both formats
   },
 
   // Create new student (Chairperson only)
@@ -34,6 +34,14 @@ export const usersService = {
   // Toggle user active status (Chairperson only)
   toggleUserStatus: async (userId) => {
     const response = await axiosInstance.patch(`/users/${userId}/status`);
+    return response.data.data || response.data; // Handle both formats
+  },
+
+  // Assign counselor to student (Chairperson only)
+  assignCounselorToStudent: async (studentId, counselorId) => {
+    const response = await axiosInstance.put(`/users/${studentId}`, {
+      assignedCounselorId: counselorId || null
+    });
     return response.data;
   }
 };

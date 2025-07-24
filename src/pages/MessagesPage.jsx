@@ -1,149 +1,107 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import ConversationList from "@/components/messages/ConversationList";
 import ChatWindow from "@/components/messages/ChatWindow";
 import { useAuth } from "@/contexts/AuthContext";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { messagesService } from "@/services/messages.service";
 
 export default function MessagesPage() {
   const [searchParams] = useSearchParams();
-  const currentUserId = "1"; // Mock current user ID
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const userRole = user?.role;
+  const currentUserId = user?.id || "1";
+  const [activeConversationId, setActiveConversationId] = useState(null);
+  
+  // State to track if we're showing the chat on mobile
+  const [showMobileChat, setShowMobileChat] = useState(false);
+  
+  // Check if we're on mobile
+  const isMobile = useMediaQuery('(max-width: 768px)');
 
-  // Mock users data
-  const users = [
-    {
-      id: "1",
-      name: "Ahmad Ali",
-      email: "ahmad.ali@student.edu",
-      role: "student",
-      isOnline: true,
-    },
-    {
-      id: "2",
-      name: "Dr. Sarah Ahmed",
-      email: "sarah@university.edu",
-      role: "counselor",
-      isOnline: true,
-    },
-    {
-      id: "3",
-      name: "Prof. Ahmad Hassan",
-      email: "ahmad@university.edu",
-      role: "counselor",
-      isOnline: false,
-    },
-    {
-      id: "4",
-      name: "Dr. Fatima Sheikh",
-      email: "fatima@university.edu",
-      role: "counselor",
-      isOnline: true,
-    },
-  ];
+  // Fetch conversations using React Query
+  const { 
+    data: conversations = [], 
+    isLoading: isLoadingConversations,
+    error: conversationsError
+  } = useQuery({
+    queryKey: ['conversations'],
+    queryFn: messagesService.getConversations,
+    refetchInterval: 30000, // Poll every 30 seconds
+    onError: (error) => {
+      toast.error(`Failed to load conversations: ${error.message}`);
+    }
+  });
 
-  // Mock file attachment
-  const mockAttachment = {
-    id: "1",
-    name: "Academic_Planning_Guide_2024.pdf",
-    size: "2.1 MB",
-    type: "application/pdf",
-    url: "/files/academic-planning-guide.pdf",
-    uploadedAt: "2024-06-20T15:02:00Z",
-  };
+  // Fetch messages for active conversation
+  const { 
+    data: conversationMessages = [], 
+    isLoading: isLoadingMessages,
+    error: messagesError
+  } = useQuery({
+    queryKey: ['messages', activeConversationId],
+    queryFn: () => activeConversationId ? messagesService.getMessages(activeConversationId) : [],
+    enabled: !!activeConversationId,
+    refetchInterval: activeConversationId ? 15000 : false, // Poll every 15 seconds when conversation is active
+    onSuccess: (data) => {
+      // Mark unread messages as read when they are loaded
+      if (data && data.length > 0) {
+        const unreadMessages = data.filter(
+          msg => !msg.isRead && msg.sender.id !== currentUserId
+        );
+        
+        if (unreadMessages.length > 0) {
+          // Mark each unread message as read
+          unreadMessages.forEach(msg => {
+            markAsReadMutation.mutate(msg.id);
+          });
+        }
+      }
+    },
+    onError: (error) => {
+      toast.error(`Failed to load messages: ${error.message}`);
+    }
+  });
 
-  // Mock messages data
-  const [messages] = useState([
-    {
-      id: "1",
-      senderId: "2",
-      receiverId: "1",
-      content:
-        "Hi Ahmad! I hope you're doing well. Just a reminder about our meeting tomorrow at 10 AM.",
-      timestamp: "2024-06-20T14:30:00Z",
-      isRead: true,
+  // Send message mutation
+  const sendMessageMutation = useMutation({
+    mutationFn: ({ conversationId, content }) => 
+      messagesService.sendMessage(conversationId, { content }),
+    onSuccess: () => {
+      // Refetch messages and conversations after sending a message
+      queryClient.invalidateQueries({ queryKey: ['messages', activeConversationId] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
-    {
-      id: "2",
-      senderId: "1",
-      receiverId: "2",
-      content:
-        "Hello Dr. Ahmed! Yes, I'll be there. Should I bring anything specific?",
-      timestamp: "2024-06-20T14:45:00Z",
-      isRead: true,
-    },
-    {
-      id: "3",
-      senderId: "2",
-      receiverId: "1",
-      content:
-        "Please bring your academic transcript and any questions about your course selection for next semester.",
-      timestamp: "2024-06-20T15:00:00Z",
-      isRead: true,
-    },
-    {
-      id: "4",
-      senderId: "2",
-      receiverId: "1",
-      content: "Here's the academic planning guide I mentioned:",
-      timestamp: "2024-06-20T15:02:00Z",
-      isRead: true,
-      attachment: mockAttachment,
-    },
-    {
-      id: "5",
-      senderId: "1",
-      receiverId: "2",
-      content: "Perfect! I have both ready. See you tomorrow!",
-      timestamp: "2024-06-20T15:05:00Z",
-      isRead: true,
-    },
-  ]);
+    onError: (error) => {
+      toast.error(`Failed to send message: ${error.message}`);
+    }
+  });
 
-  // Mock conversations data
-  const [conversations, setConversations] = useState([
-    {
-      id: "1",
-      participants: [users[0], users[1]], // Ahmad Ali & Dr. Sarah Ahmed
-      lastMessage: messages[4],
-      unreadCount: 0,
-      updatedAt: "2024-06-20T15:05:00Z",
+  // Start conversation mutation
+  const startConversationMutation = useMutation({
+    mutationFn: (participantId) => messagesService.startConversation(participantId),
+    onSuccess: (data) => {
+      setActiveConversationId(data.conversation.id);
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      toast.success(`Started conversation successfully`);
     },
-    {
-      id: "2",
-      participants: [users[0], users[2]], // Ahmad Ali & Prof. Ahmad Hassan
-      lastMessage: {
-        id: "6",
-        senderId: "3",
-        receiverId: "1",
-        content:
-          "I have approved your course selection. Check the resources section for additional materials.",
-        timestamp: "2024-06-19T10:00:00Z",
-        isRead: false,
-      },
-      unreadCount: 1,
-      updatedAt: "2024-06-19T10:00:00Z",
-    },
-    {
-      id: "3",
-      participants: [users[0], users[3]], // Ahmad Ali & Dr. Fatima Sheikh
-      lastMessage: {
-        id: "7",
-        senderId: "4",
-        receiverId: "1",
-        content:
-          "Thank you for the session today. Here are the action items we discussed...",
-        timestamp: "2024-06-17T16:30:00Z",
-        isRead: false,
-      },
-      unreadCount: 1,
-      updatedAt: "2024-06-17T16:30:00Z",
-    },
-  ]);
+    onError: (error) => {
+      toast.error(`Failed to start conversation: ${error.message || "Unknown error"}`);
+    }
+  });
 
-  const [activeConversationId, setActiveConversationId] = useState("1");
+  // Mark message as read mutation
+  const markAsReadMutation = useMutation({
+    mutationFn: (messageId) => messagesService.markAsRead(messageId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    }
+  });
 
   // Check for userId in URL params and start conversation if needed
   useEffect(() => {
@@ -152,85 +110,75 @@ export default function MessagesPage() {
       handleStartConversation(userId);
     }
   }, [searchParams]);
+  
+  // Auto-select the first conversation if none is selected and conversations are loaded
+  useEffect(() => {
+    if (!activeConversationId && conversations.length > 0 && !isLoadingConversations) {
+      setActiveConversationId(conversations[0].id);
+    }
+  }, [activeConversationId, conversations, isLoadingConversations]);
+  
+  // Effect to show chat on mobile when a conversation is selected
+  useEffect(() => {
+    if (isMobile && activeConversationId) {
+      setShowMobileChat(true);
+    }
+  }, [isMobile, activeConversationId]);
 
   const activeConversation = conversations.find(
     (c) => c.id === activeConversationId
   );
-  const conversationMessages = activeConversationId
-    ? messages.filter(
-        (m) =>
-          (m.senderId === currentUserId &&
-            m.receiverId ===
-              activeConversation?.participants.find(
-                (p) => p.id !== currentUserId
-              )?.id) ||
-          (m.receiverId === currentUserId &&
-            m.senderId ===
-              activeConversation?.participants.find(
-                (p) => p.id !== currentUserId
-              )?.id)
-      )
-    : [];
 
-  const handleSendMessage = (content, file) => {
+  const handleSendMessage = (messageData) => {
     if (!activeConversationId) return;
 
-    // In a real app, this would send the message to the server
-    console.log("Sending message:", {
-      content,
-      file,
-      conversationId: activeConversationId,
-    });
-
-    // Mock success feedback
-    if (file) {
-      console.log("File attached:", file.name);
+    try {
+      // Add loading state or optimistic update if needed
+      sendMessageMutation.mutate({ 
+        conversationId: activeConversationId, 
+        ...messageData
+      });
+    } catch (error) {
+      toast.error("Failed to send message");
     }
+  };
+  
+  // Function to handle marking a message as read
+  const handleMarkAsRead = (messageId) => {
+    if (!messageId) return;
+    
+    markAsReadMutation.mutate(messageId);
   };
 
   const handleStartConversation = async (userId) => {
     try {
-      // Find the user to start conversation with
-      const targetUser = [...users].find((u) => u.id === userId);
-      if (!targetUser) {
-        toast.error("User not found");
-        return;
-      }
-
       // Check if conversation already exists
       const existingConversation = conversations.find((conv) =>
-        conv.participants.some((p) => p.id === userId)
+        conv.otherUser.id === userId
       );
 
       if (existingConversation) {
         setActiveConversationId(existingConversation.id);
-        toast.info(`Opened conversation with ${targetUser.name}`);
+        if (isMobile) {
+          setShowMobileChat(true);
+        }
+        toast.info(`Opened existing conversation`);
         return;
       }
 
-      // Create new conversation
-      const newConversation = {
-        id: Date.now().toString(),
-        participants: [users.find((u) => u.id === currentUserId), targetUser],
-        lastMessage: {
-          id: Date.now().toString(),
-          senderId: currentUserId,
-          receiverId: userId,
-          content: "Conversation started",
-          timestamp: new Date().toISOString(),
-          isRead: false,
-        },
-        unreadCount: 0,
-        updatedAt: new Date().toISOString(),
-      };
-
-      setConversations((prev) => [newConversation, ...prev]);
-      setActiveConversationId(newConversation.id);
-      toast.success(`Started conversation with ${targetUser.name}`);
+      // Start new conversation
+      startConversationMutation.mutate(userId);
+      if (isMobile) {
+        setShowMobileChat(true);
+      }
     } catch (error) {
       toast.error("Failed to start conversation");
-      throw error;
     }
+  };
+  
+  // Handle back button on mobile
+  const handleBackToList = () => {
+    setShowMobileChat(false);
   };
 
   // Check if user can access messaging
@@ -255,52 +203,90 @@ export default function MessagesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header Section */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Messages & Resources
+      <main className="max-w-7xl mx-auto px-2 sm:px-4 md:px-6 lg:px-8 py-4 md:py-8">
+        {/* Header Section - Simplified on mobile */}
+        <div className="mb-4 md:mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+            Messages
           </h1>
-          <p className="text-gray-600 mt-2">
+          <p className="text-sm md:text-base text-gray-600 mt-1 md:mt-2">
             Communicate with your{" "}
-            {userRole === "student" ? "counselors" : "students"} and share
-            resources in real-time.
+            {userRole === "student" ? "counselor" : "students"}
           </p>
         </div>
 
         {/* Messages Interface */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-[calc(100vh-200px)] flex">
-          {/* Conversation List */}
-          <ConversationList
-            conversations={conversations}
-            activeConversationId={activeConversationId}
-            onConversationSelect={setActiveConversationId}
-            currentUserId={currentUserId}
-            userRole={userRole}
-            onStartConversation={handleStartConversation}
-          />
-
-          {/* Chat Window */}
-          {activeConversation ? (
-            <ChatWindow
-              conversation={activeConversation}
-              messages={conversationMessages}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-[calc(100vh-140px)] md:h-[calc(100vh-200px)] flex">
+          {/* Conversation List - Hidden on mobile when chat is shown */}
+          <div className={`${isMobile && showMobileChat ? 'hidden' : 'flex'} md:flex flex-col w-full md:w-80`}>
+            <ConversationList
+              conversations={conversations}
+              activeConversationId={activeConversationId}
+              onConversationSelect={(id) => {
+                setActiveConversationId(id);
+                if (isMobile) {
+                  setShowMobileChat(true);
+                }
+              }}
               currentUserId={currentUserId}
-              onSendMessage={handleSendMessage}
+              userRole={userRole}
+              onStartConversation={handleStartConversation}
+              isLoading={isLoadingConversations}
             />
-          ) : (
-            <div className="flex-1 flex items-center justify-center bg-gray-50">
-              <div className="text-center">
-                <MessageCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Select a conversation
-                </h3>
-                <p className="text-gray-500">
-                  Choose a conversation from the list to start messaging.
-                </p>
+          </div>
+
+          {/* Right Panel - Full width on mobile when chat is shown */}
+          <div className={`${isMobile && !showMobileChat ? 'hidden' : 'flex'} md:flex flex-1 flex-col`}>
+            {activeConversation ? (
+              <>
+                {/* Mobile back button */}
+                {isMobile && (
+                  <div className="bg-gray-100 p-2 flex items-center">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={handleBackToList}
+                      className="flex items-center text-gray-600"
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-1" />
+                      Back to conversations
+                    </Button>
+                  </div>
+                )}
+                
+                <ChatWindow
+                  conversation={activeConversation}
+                  messages={conversationMessages}
+                  currentUserId={currentUserId}
+                  onSendMessage={handleSendMessage}
+                  onMarkAsRead={handleMarkAsRead}
+                  isLoading={isLoadingMessages}
+                />
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center bg-gray-50">
+                <div className="text-center">
+                  <MessageCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Select a conversation
+                  </h3>
+                  <p className="text-gray-500">
+                    Choose a conversation from the list to start messaging.
+                  </p>
+                  {/* Mobile back button when no conversation is selected */}
+                  {isMobile && showMobileChat && (
+                    <Button 
+                      onClick={handleBackToList}
+                      className="mt-4 bg-[#0056b3] hover:bg-[#004494]"
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Back to conversations
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </main>
     </div>

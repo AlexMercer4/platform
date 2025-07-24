@@ -1,271 +1,112 @@
-import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
-import { MessageCircle, FolderOpen } from "lucide-react";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { 
+  Calendar, 
+  MessageCircle, 
+  Clock, 
+  ChevronRight, 
+  AlertCircle,
+  Loader2
+} from "lucide-react";
+import { format } from "date-fns";
 import { toast } from "sonner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import ConversationList from "@/components/messages/ConversationList";
-import ChatWindow from "@/components/messages/ChatWindow";
-import ResourcesPanel from "@/components/messages/ResourcesPanel";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
+import { dashboardService } from "@/services/dashboard.service";
+import { appointmentsService } from "@/services/appointments.service";
 
-export default function MessagesPage() {
-  const [searchParams] = useSearchParams();
-  const currentUserId = "1"; // Mock current user ID
+export default function StudentDashboard() {
   const { user } = useAuth();
-  const userRole = user?.role;
-  const [activeTab, setActiveTab] = useState("messages");
+  const [timeframe, setTimeframe] = useState("upcoming"); // "upcoming" or "past"
 
-  // Mock users data
-  const users = [
-    {
-      id: "1",
-      name: "Ahmad Ali",
-      email: "ahmad.ali@student.edu",
-      role: "student",
-      isOnline: true,
-    },
-    {
-      id: "2",
-      name: "Dr. Sarah Ahmed",
-      email: "sarah@university.edu",
-      role: "counselor",
-      isOnline: true,
-    },
-    {
-      id: "3",
-      name: "Prof. Ahmad Hassan",
-      email: "ahmad@university.edu",
-      role: "counselor",
-      isOnline: false,
-    },
-    {
-      id: "4",
-      name: "Dr. Fatima Sheikh",
-      email: "fatima@university.edu",
-      role: "counselor",
-      isOnline: true,
-    },
-  ];
-
-  // Mock shared resources data
-  const [sharedResources] = useState([
-    {
-      id: "1",
-      name: "Academic_Planning_Guide_2024.pdf",
-      size: "2.1 MB",
-      type: "application/pdf",
-      url: "/files/academic-planning-guide.pdf",
-      uploadedAt: "2024-06-20T15:02:00Z",
-      uploadedBy: "Dr. Sarah Ahmed",
-      sharedWith: ["Ahmad Ali"],
-      description: "Comprehensive guide for academic planning and course selection",
-    },
-    {
-      id: "2",
-      name: "Career_Opportunities_CS_2024.docx",
-      size: "1.8 MB",
-      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      url: "/files/career-opportunities-cs.docx",
-      uploadedAt: "2024-06-18T14:30:00Z",
-      uploadedBy: "Prof. Ahmad Hassan",
-      sharedWith: ["Ahmad Ali"],
-      description: "Career opportunities in Computer Science field",
-    },
-  ]);
-
-  // Mock messages data
-  const [messages] = useState([
-    {
-      id: "1",
-      senderId: "2",
-      receiverId: "1",
-      content:
-        "Hi Ahmad! I hope you're doing well. Just a reminder about our meeting tomorrow at 10 AM.",
-      timestamp: "2024-06-20T14:30:00Z",
-      isRead: true,
-    },
-    {
-      id: "2",
-      senderId: "1",
-      receiverId: "2",
-      content:
-        "Hello Dr. Ahmed! Yes, I'll be there. Should I bring anything specific?",
-      timestamp: "2024-06-20T14:45:00Z",
-      isRead: true,
-    },
-    {
-      id: "3",
-      senderId: "2",
-      receiverId: "1",
-      content:
-        "Please bring your academic transcript and any questions about your course selection for next semester.",
-      timestamp: "2024-06-20T15:00:00Z",
-      isRead: true,
-    },
-    {
-      id: "4",
-      senderId: "2",
-      receiverId: "1",
-      content: "Here's the academic planning guide I mentioned:",
-      timestamp: "2024-06-20T15:02:00Z",
-      isRead: true,
-    },
-    {
-      id: "5",
-      senderId: "1",
-      receiverId: "2",
-      content: "Perfect! I have both ready. See you tomorrow!",
-      timestamp: "2024-06-20T15:05:00Z",
-      isRead: true,
-    },
-  ]);
-
-  // Mock conversations data
-  const [conversations, setConversations] = useState([
-    {
-      id: "1",
-      participants: [users[0], users[1]], // Ahmad Ali & Dr. Sarah Ahmed
-      lastMessage: messages[4],
-      unreadCount: 0,
-      updatedAt: "2024-06-20T15:05:00Z",
-    },
-    {
-      id: "2",
-      participants: [users[0], users[2]], // Ahmad Ali & Prof. Ahmad Hassan
-      lastMessage: {
-        id: "6",
-        senderId: "3",
-        receiverId: "1",
-        content:
-          "I have approved your course selection. Check the resources section for additional materials.",
-        timestamp: "2024-06-19T10:00:00Z",
-        isRead: false,
-      },
-      unreadCount: 1,
-      updatedAt: "2024-06-19T10:00:00Z",
-    },
-    {
-      id: "3",
-      participants: [users[0], users[3]], // Ahmad Ali & Dr. Fatima Sheikh
-      lastMessage: {
-        id: "7",
-        senderId: "4",
-        receiverId: "1",
-        content:
-          "Thank you for the session today. Here are the action items we discussed...",
-        timestamp: "2024-06-17T16:30:00Z",
-        isRead: false,
-      },
-      unreadCount: 1,
-      updatedAt: "2024-06-17T16:30:00Z",
-    },
-  ]);
-
-  const [activeConversationId, setActiveConversationId] = useState("1");
-
-  // Check for userId in URL params and start conversation if needed
-  useEffect(() => {
-    const userId = searchParams.get("userId");
-    if (userId) {
-      handleStartConversation(userId);
+  // Fetch dashboard stats
+  const { 
+    data: stats, 
+    isLoading: isLoadingStats,
+    error: statsError
+  } = useQuery({
+    queryKey: ['dashboardStats'],
+    queryFn: dashboardService.getDashboardStats,
+    onError: (error) => {
+      toast.error(`Failed to load dashboard statistics: ${error.message}`);
     }
-  }, [searchParams]);
+  });
 
-  const activeConversation = conversations.find(
-    (c) => c.id === activeConversationId
-  );
-  const conversationMessages = activeConversationId
-    ? messages.filter(
-        (m) =>
-          (m.senderId === currentUserId &&
-            m.receiverId ===
-              activeConversation?.participants.find(
-                (p) => p.id !== currentUserId
-              )?.id) ||
-          (m.receiverId === currentUserId &&
-            m.senderId ===
-              activeConversation?.participants.find(
-                (p) => p.id !== currentUserId
-              )?.id)
-      )
-    : [];
-
-  const handleSendMessage = (content, file) => {
-    if (!activeConversationId) return;
-
-    // In a real app, this would send the message to the server
-    console.log("Sending message:", {
-      content,
-      file,
-      conversationId: activeConversationId,
-    });
-
-    // Mock success feedback
-    if (file) {
-      console.log("File attached:", file.name);
+  // Fetch recent appointments
+  const { 
+    data: appointments = [], 
+    isLoading: isLoadingAppointments,
+    error: appointmentsError
+  } = useQuery({
+    queryKey: ['recentAppointments', timeframe],
+    queryFn: () => appointmentsService.getAppointments({ 
+      status: timeframe === "upcoming" ? ["scheduled", "pending"] : ["completed", "cancelled"],
+      limit: 5
+    }),
+    onError: (error) => {
+      toast.error(`Failed to load appointments: ${error.message}`);
     }
-  };
+  });
 
-  const handleStartConversation = async (userId) => {
+  // Format appointment time
+  const formatAppointmentTime = (date, time) => {
     try {
-      // Find the user to start conversation with
-      const targetUser = [...users].find((u) => u.id === userId);
-      if (!targetUser) {
-        toast.error("User not found");
-        return;
-      }
-
-      // Check if conversation already exists
-      const existingConversation = conversations.find((conv) =>
-        conv.participants.some((p) => p.id === userId)
-      );
-
-      if (existingConversation) {
-        setActiveConversationId(existingConversation.id);
-        toast.info(`Opened conversation with ${targetUser.name}`);
-        return;
-      }
-
-      // Create new conversation
-      const newConversation = {
-        id: Date.now().toString(),
-        participants: [users.find((u) => u.id === currentUserId), targetUser],
-        lastMessage: {
-          id: Date.now().toString(),
-          senderId: currentUserId,
-          receiverId: userId,
-          content: "Conversation started",
-          timestamp: new Date().toISOString(),
-          isRead: false,
-        },
-        unreadCount: 0,
-        updatedAt: new Date().toISOString(),
-      };
-
-      setConversations((prev) => [newConversation, ...prev]);
-      setActiveConversationId(newConversation.id);
-      toast.success(`Started conversation with ${targetUser.name}`);
+      return format(new Date(`${date}T${time}`), "h:mm a");
     } catch (error) {
-      toast.error("Failed to start conversation");
-      throw error;
+      return time;
     }
   };
 
-  // Check if user can access messaging
-  if (userRole === "chairperson") {
+  // Format appointment date
+  const formatAppointmentDate = (date) => {
+    try {
+      return format(new Date(date), "MMMM d, yyyy");
+    } catch (error) {
+      return date;
+    }
+  };
+
+  // Get status badge color
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "scheduled": return "bg-green-100 text-green-800";
+      case "pending": return "bg-yellow-100 text-yellow-800";
+      case "completed": return "bg-blue-100 text-blue-800";
+      case "cancelled": return "bg-red-100 text-red-800";
+      default: return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  if (isLoadingStats && isLoadingAppointments) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">
-            <MessageCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Access Restricted
-            </h3>
-            <p className="text-gray-500">
-              Chairpersons do not have access to the messaging system.
-            </p>
-          </div>
-        </main>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (statsError || appointmentsError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Error Loading Dashboard</h2>
+          <p className="text-gray-600 mb-4">
+            {statsError?.message || appointmentsError?.message || "Failed to load dashboard data. Please try again."}
+          </p>
+          <Button 
+            onClick={() => window.location.reload()}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            Retry
+          </Button>
+        </div>
       </div>
     );
   }
@@ -273,52 +114,216 @@ export default function MessagesPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header Section */}
+        {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">
-            Messages & Resources
+            Welcome back, {user?.name || "Student"}
           </h1>
           <p className="text-gray-600 mt-2">
-            Communicate with your{" "}
-            {userRole === "student" ? "counselors" : "students"} and share
-            resources in real-time.
+            Here's an overview of your counseling activities and upcoming appointments.
           </p>
         </div>
 
-        {/* Messages Interface */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-[calc(100vh-200px)] flex">
-          {/* Conversation List */}
-          <ConversationList
-            conversations={conversations}
-            activeConversationId={activeConversationId}
-            onConversationSelect={setActiveConversationId}
-            currentUserId={currentUserId}
-            userRole={userRole}
-            onStartConversation={handleStartConversation}
-          />
-
-          {/* Chat Window */}
-          {activeConversation ? (
-            <ChatWindow
-              conversation={activeConversation}
-              messages={conversationMessages}
-              currentUserId={currentUserId}
-              onSendMessage={handleSendMessage}
-            />
-          ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center">
-                <MessageCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Select a conversation
-                </h3>
-                <p className="text-gray-500">
-                  Choose a conversation from the list to start messaging.
-                </p>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">
+                Upcoming Appointments
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-baseline">
+                <div className="text-3xl font-bold text-gray-900">
+                  {isLoadingStats ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                  ) : (
+                    stats?.upcomingAppointments || 0
+                  )}
+                </div>
+                <div className="ml-2 text-sm text-gray-500">scheduled</div>
               </div>
-            </div>
-          )}
+
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">
+                Unread Messages
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-baseline">
+                <div className="text-3xl font-bold text-gray-900">
+                  {isLoadingStats ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                  ) : (
+                    stats?.unreadMessages || 0
+                  )}
+                </div>
+                <div className="ml-2 text-sm text-gray-500">messages</div>
+              </div>
+
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">
+                Session Hours
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-baseline">
+                <div className="text-3xl font-bold text-gray-900">
+                  {isLoadingStats ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                  ) : (
+                    stats?.sessionHours || 0
+                  )}
+                </div>
+                <div className="ml-2 text-sm text-gray-500">hours</div>
+              </div>
+
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Appointments Section */}
+        <Card className="mb-8">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Appointments</CardTitle>
+              <CardDescription>
+                View and manage your counseling appointments
+              </CardDescription>
+            </div>
+            <div className="flex space-x-2">
+              <Button 
+                variant={timeframe === "upcoming" ? "default" : "outline"} 
+                size="sm"
+                onClick={() => setTimeframe("upcoming")}
+              >
+                Upcoming
+              </Button>
+              <Button 
+                variant={timeframe === "past" ? "default" : "outline"} 
+                size="sm"
+                onClick={() => setTimeframe("past")}
+              >
+                Past
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoadingAppointments ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              </div>
+            ) : appointments.length === 0 ? (
+              <div className="text-center py-8">
+                <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-1">
+                  No {timeframe} appointments
+                </h3>
+                <p className="text-gray-500 mb-4">
+                  {timeframe === "upcoming" 
+                    ? "You don't have any upcoming appointments scheduled."
+                    : "You don't have any past appointments."}
+                </p>
+                {timeframe === "upcoming" && (
+                  <Link to="/appointments">
+                    <Button>Book an Appointment</Button>
+                  </Link>
+                )}
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-200">
+                {appointments.map((appointment) => (
+                  <div key={appointment.id} className="py-4 flex items-center justify-between">
+                    <div className="flex items-start">
+                      <div className="mr-4 mt-1">
+                        <Calendar className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <div>
+                        <h4 className="text-base font-medium text-gray-900">
+                          {appointment.type} Session with {appointment.counselor.name}
+                        </h4>
+                        <div className="mt-1 flex items-center text-sm text-gray-500">
+                          <span>{formatAppointmentDate(appointment.date)}</span>
+                          <span className="mx-1">•</span>
+                          <Clock className="h-3 w-3 mr-1" />
+                          <span>{formatAppointmentTime(appointment.date, appointment.time)}</span>
+                          <span className="mx-1">•</span>
+                          <span>{appointment.duration} min</span>
+                        </div>
+                        <div className="mt-1">
+                          <Badge className={getStatusColor(appointment.status)}>
+                            {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                    <Link to={`/appointments?id=${appointment.id}`}>
+                      <Button variant="ghost" size="sm">
+                        <ChevronRight className="h-5 w-5" />
+                      </Button>
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-4 text-center">
+              <Link to="/appointments">
+                <Button variant="outline">
+                  View All Appointments
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Counselor Section */}
+        {stats?.assignedCounselor && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Your Counselor</CardTitle>
+              <CardDescription>
+                Your assigned academic counselor
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center">
+                <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-lg mr-4">
+                  {stats.assignedCounselor.name.charAt(0)}
+                </div>
+                <div>
+                  <h4 className="text-base font-medium text-gray-900">
+                    {stats.assignedCounselor.name}
+                  </h4>
+                  <p className="text-sm text-gray-500">
+                    {stats.assignedCounselor.department} • {stats.assignedCounselor.specialization.join(", ")}
+                  </p>
+                </div>
+                <div className="ml-auto flex space-x-2">
+                  <Link to={`/messages?userId=${stats.assignedCounselor.id}`}>
+                    <Button variant="outline" size="sm">
+                      <MessageCircle className="h-4 w-4 mr-2" />
+                      Message
+                    </Button>
+                  </Link>
+                  <Link to="/appointments">
+                    <Button size="sm">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Book Session
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </main>
     </div>
   );

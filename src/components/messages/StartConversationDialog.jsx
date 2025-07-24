@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Search, User, Plus } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Search, User, Plus, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -9,6 +9,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useQuery } from "@tanstack/react-query";
+import { messagesService } from "@/services/messages.service";
+import { toast } from "sonner";
 
 export default function StartConversationDialog({
   open,
@@ -19,89 +22,33 @@ export default function StartConversationDialog({
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // Mock data - replace with actual API calls
-  const counselors = [
-    {
-      id: "2",
-      name: "Dr. Sarah Ahmed",
-      email: "sarah@university.edu",
-      role: "counselor",
-      isOnline: true,
-    },
-    {
-      id: "3",
-      name: "Prof. Ahmad Hassan",
-      email: "ahmad@university.edu",
-      role: "counselor",
-      isOnline: false,
-    },
-    {
-      id: "4",
-      name: "Dr. Fatima Sheikh",
-      email: "fatima@university.edu",
-      role: "counselor",
-      isOnline: true,
-    },
-    {
-      id: "5",
-      name: "Dr. Ali Khan",
-      email: "ali@university.edu",
-      role: "counselor",
-      isOnline: false,
-    },
-    {
-      id: "6",
-      name: "Prof. Zara Malik",
-      email: "zara@university.edu",
-      role: "counselor",
-      isOnline: true,
-    },
-  ];
+  // Use React Query to fetch assigned users when dialog opens and filter with search
+  const {
+    data: searchResults = { data: [] },
+    isLoading: isSearching,
+    error
+  } = useQuery({
+    queryKey: ['messageUsers', searchQuery],
+    queryFn: () => messagesService.searchUsers(searchQuery),
+    enabled: open, // Always fetch when dialog is open
+    staleTime: 30000, // Cache results for 30 seconds
+    onError: (error) => {
+      toast.error(`Failed to load users: ${error.message}`);
+    }
+  });
 
-  const students = [
-    {
-      id: "7",
-      name: "Ahmad Ali",
-      email: "ahmad.ali@student.edu",
-      role: "student",
-      isOnline: true,
-    },
-    {
-      id: "8",
-      name: "Fatima Khan",
-      email: "fatima.khan@student.edu",
-      role: "student",
-      isOnline: false,
-    },
-    {
-      id: "9",
-      name: "Hassan Ahmed",
-      email: "hassan.ahmed@student.edu",
-      role: "student",
-      isOnline: true,
-    },
-    {
-      id: "10",
-      name: "Ayesha Malik",
-      email: "ayesha.malik@student.edu",
-      role: "student",
-      isOnline: false,
-    },
-    {
-      id: "11",
-      name: "Omar Sheikh",
-      email: "omar.sheikh@student.edu",
-      role: "student",
-      isOnline: true,
-    },
-  ];
-
-  const availableUsers = userRole === "student" ? counselors : students;
-  const filteredUsers = availableUsers.filter(
-    (user) =>
-      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Get all users from the API response
+  const allUsers = searchResults.data || [];
+  
+  // Filter users based on search query if provided
+  const users = searchQuery.length > 0
+    ? allUsers.filter(user => 
+        user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (user.studentId && user.studentId.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (user.department && user.department.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : allUsers;
 
   const handleStartConversation = async (userId) => {
     setIsLoading(true);
@@ -119,6 +66,13 @@ export default function StartConversationDialog({
   const resetDialog = () => {
     setSearchQuery("");
   };
+  
+  // Effect to reset search when dialog opens
+  useEffect(() => {
+    if (open) {
+      setSearchQuery("");
+    }
+  }, [open]);
 
   return (
     <Dialog
@@ -144,7 +98,7 @@ export default function StartConversationDialog({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
-              placeholder={`Search ${
+              placeholder={`Filter ${
                 userRole === "student" ? "counselors" : "students"
               }...`}
               value={searchQuery}
@@ -152,17 +106,36 @@ export default function StartConversationDialog({
               className="pl-10 bg-gray-50 border-gray-200 focus:bg-white"
             />
           </div>
+          
+          {/* User Count */}
+          {!isSearching && users.length > 0 && (
+            <div className="text-sm text-gray-500">
+              {searchQuery.length > 0 
+                ? `Found ${users.length} matching ${users.length === 1 ? 'user' : 'users'}`
+                : userRole === "student" 
+                  ? "Your assigned counselor:"
+                  : `Your assigned students (${users.length}):`
+              }
+            </div>
+          )}
 
           {/* Users List */}
           <div className="max-h-80 overflow-y-auto space-y-2">
-            {filteredUsers.length === 0 ? (
+            {isSearching ? (
               <div className="text-center py-8 text-gray-500">
-                {searchQuery
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-[#0056b3]" />
+                <p>Loading users...</p>
+              </div>
+            ) : users.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                {searchQuery.length > 0
                   ? "No users found matching your search"
-                  : "No users available"}
+                  : userRole === "student"
+                  ? "You don't have an assigned counselor"
+                  : "You don't have any assigned students"}
               </div>
             ) : (
-              filteredUsers.map((user) => (
+              users.map((user) => (
                 <div
                   key={user.id}
                   className="flex items-center justify-between p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors duration-200"
@@ -172,9 +145,6 @@ export default function StartConversationDialog({
                       <div className="bg-gray-200 p-2 rounded-full">
                         <User className="h-5 w-5 text-gray-600" />
                       </div>
-                      {user.isOnline && (
-                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                      )}
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -184,21 +154,22 @@ export default function StartConversationDialog({
                       <p className="text-xs text-gray-500 truncate">
                         {user.email}
                       </p>
+                      <div className="mt-1">
+                        {user.role === "student" && (
+                          <Badge variant="outline" className="text-xs bg-blue-50 border-blue-200 text-blue-700">
+                            Student ID: {user.studentId}
+                          </Badge>
+                        )}
+                        {user.role === "counselor" && (
+                          <Badge variant="outline" className="text-xs bg-green-50 border-green-200 text-green-700">
+                            {user.department || "Counselor"}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-2">
-                    <Badge
-                      variant={user.isOnline ? "default" : "secondary"}
-                      className={
-                        user.isOnline
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-100 text-gray-600"
-                      }
-                    >
-                      {user.isOnline ? "Online" : "Offline"}
-                    </Badge>
-
+                  <div>
                     <Button
                       size="sm"
                       onClick={() => handleStartConversation(user.id)}

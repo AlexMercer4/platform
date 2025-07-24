@@ -7,10 +7,16 @@ export const studentsService = {
     return response.data;
   },
 
+  // Get counselor's assigned students (for appointment booking)
+  getAssignedStudents: async () => {
+    const response = await axiosInstance.get('/students/assigned');
+    return response.data;
+  },
+
   // Get student details
   getStudentById: async (studentId) => {
     const response = await axiosInstance.get(`/students/${studentId}`);
-    return response.data;
+    return response.data.data || response.data;
   },
 
   // Update student profile

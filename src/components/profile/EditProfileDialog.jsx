@@ -22,11 +22,9 @@ export default function EditProfileDialog({
     name: "",
     phone: "",
     address: "",
-    emergencyContact: {
-      name: "",
-      phone: "",
-      relationship: "",
-    },
+    emergencyContactName: "",
+    emergencyContactPhone: "",
+    emergencyContactRelationship: "",
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -37,11 +35,9 @@ export default function EditProfileDialog({
         name: userProfile.name || "",
         phone: userProfile.phone || "",
         address: userProfile.address || "",
-        emergencyContact: {
-          name: userProfile.emergencyContact?.name || "",
-          phone: userProfile.emergencyContact?.phone || "",
-          relationship: userProfile.emergencyContact?.relationship || "",
-        },
+        emergencyContactName: userProfile.emergencyContactName || userProfile.emergencyContact?.name || "",
+        emergencyContactPhone: userProfile.emergencyContactPhone || userProfile.emergencyContact?.phone || "",
+        emergencyContactRelationship: userProfile.emergencyContactRelationship || userProfile.emergencyContact?.relationship || "",
       });
     }
   }, [open, userProfile]);
@@ -56,10 +52,7 @@ export default function EditProfileDialog({
   const handleEmergencyContactChange = (field, value) => {
     setFormData((prev) => ({
       ...prev,
-      emergencyContact: {
-        ...prev.emergencyContact,
-        [field]: value,
-      },
+      [`emergencyContact${field.charAt(0).toUpperCase() + field.slice(1)}`]: value,
     }));
   };
 
@@ -149,7 +142,7 @@ export default function EditProfileDialog({
                 <Label htmlFor="emergencyName">Contact Name</Label>
                 <Input
                   id="emergencyName"
-                  value={formData.emergencyContact?.name || ""}
+                  value={formData.emergencyContactName}
                   onChange={(e) =>
                     handleEmergencyContactChange("name", e.target.value)
                   }
@@ -161,7 +154,7 @@ export default function EditProfileDialog({
                 <Label htmlFor="emergencyPhone">Contact Phone</Label>
                 <Input
                   id="emergencyPhone"
-                  value={formData.emergencyContact?.phone || ""}
+                  value={formData.emergencyContactPhone}
                   onChange={(e) =>
                     handleEmergencyContactChange("phone", e.target.value)
                   }
@@ -174,7 +167,7 @@ export default function EditProfileDialog({
               <Label htmlFor="emergencyRelationship">Relationship</Label>
               <Input
                 id="emergencyRelationship"
-                value={formData.emergencyContact?.relationship || ""}
+                value={formData.emergencyContactRelationship}
                 onChange={(e) =>
                   handleEmergencyContactChange("relationship", e.target.value)
                 }

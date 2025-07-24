@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   User,
   Mail,
@@ -11,14 +12,19 @@ import {
   GraduationCap,
   Edit,
   Key,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import Header from "@/components/layout/Header";
 import EditProfileDialog from "@/components/profile/EditProfileDialog";
 import { useAuth } from "@/contexts/AuthContext";
+import { authService } from "@/services/auth.service";
+import { studentsService } from "@/services/students.service";
+import { counselorsService } from "@/services/counselors.service";
+import { usersService } from "@/services/users.service";
 
 export default function ProfilePage() {
   const { id } = useParams();
@@ -26,124 +32,106 @@ export default function ProfilePage() {
   const { user } = useAuth();
   const userRole = user?.role;
 
-  // Mock function to get student data by ID
-  const getStudentById = (studentId) => {
-    const mockStudents = {
-      1: {
-        id: "1",
-        name: "Ahmad Ali",
-        email: "ahmad.ali@student.buitems.edu.pk",
-        phone: "+92 300 1234567",
-        role: "student",
-        studentId: "CS-2024-001",
-        department: "Computer Science",
-        currentSemester: "6th Semester",
-        cgpa: 3.85,
-        enrollmentDate: "September 2022",
-        academicAdvisor: "Dr. Sarah Ahmed",
-        address: "House 123, Street 45, Quetta, Balochistan",
-        emergencyContact: {
-          name: "Muhammad Ali",
-          phone: "+92 300 9876543",
-          relationship: "Father",
-        },
-        createdAt: "2022-09-01T00:00:00Z",
-        updatedAt: "2024-06-20T10:00:00Z",
-        lastLogin: "2024-06-20T14:30:00Z",
-      },
-      2: {
-        id: "2",
-        name: "Fatima Khan",
-        email: "fatima.khan@student.buitems.edu.pk",
-        phone: "+92 301 2345678",
-        role: "student",
-        studentId: "EE-2024-015",
-        department: "Electrical Engineering",
-        currentSemester: "4th Semester",
-        cgpa: 3.92,
-        enrollmentDate: "September 2023",
-        academicAdvisor: "Prof. Ahmad Hassan",
-        address: "House 456, Street 78, Quetta, Balochistan",
-        emergencyContact: {
-          name: "Abdul Khan",
-          phone: "+92 301 8765432",
-          relationship: "Father",
-        },
-        createdAt: "2023-09-01T00:00:00Z",
-        updatedAt: "2024-06-18T10:00:00Z",
-        lastLogin: "2024-06-18T16:20:00Z",
-      },
-    };
+  const queryClient = useQueryClient();
+  const isViewingOtherProfile = id && userRole === "counselor";
 
-    return mockStudents[studentId] || null;
-  };
+  // Fetch current user profile or specific student profile
+  const {
+    data: userProfile,
+    isLoading: isLoadingProfile,
+    error: profileError
+  } = useQuery({
+    queryKey: ['profile', id || user?.id],
+    queryFn: async () => {
+      try {
+        // If viewing another student's profile as a counselor
+        if (isViewingOtherProfile) {
+          const response = await studentsService.getStudentById(id);
+          console.log("Student profile (other):", response);
+          const profileData = response.data || response;
+          return { ...profileData, role: "student" };
+        }
 
-  // Mock user profile data - replace with actual API calls
-  const [userProfile, setUserProfile] = useState(() => {
-    // If viewing another user's profile (counselor viewing student)
-    if (id && userRole === "counselor") {
-      const studentProfile = getStudentById(id);
-      if (studentProfile) {
-        return studentProfile;
+        // Otherwise fetch current user's profile based on role
+        if (userRole === "student") {
+          const userData = await authService.getCurrentUser();
+          console.log("Current user data (student):", userData);
+          const actualUser = userData.user || userData;
+          const response = await studentsService.getStudentById(actualUser.id);
+          console.log("Student profile:", response);
+          const profileData = response.data || response;
+          return { ...profileData, role: "student" };
+        } else if (userRole === "counselor") {
+          const userData = await authService.getCurrentUser();
+          console.log("Current user data (counselor):", userData);
+          const actualUser = userData.user || userData;
+          const response = await counselorsService.getCounselorById(actualUser.id);
+          console.log("Counselor profile:", response);
+          const profileData = response.data || response;
+
+          // Ensure counselor professional information is available
+          return {
+            ...profileData,
+            role: "counselor",
+            specialization: profileData.specialization || ["General Counseling"],
+            officeLocation: profileData.officeLocation || "Main Campus",
+            officeHours: profileData.officeHours || "9:00 AM - 5:00 PM",
+            yearsOfExperience: profileData.yearsOfExperience || 0,
+            currentStudentsCount: profileData.currentStudentsCount || 0,
+            maxStudentsCapacity: profileData.maxStudentsCapacity || 40
+          };
+        } else {
+          // For chairperson or other roles, just use the basic user data
+          const userData = await authService.getCurrentUser();
+          console.log("Current user data (chairperson):", userData);
+          const profileData = userData.user || userData;
+
+          // Add default professional information for chairperson
+          return {
+            ...profileData,
+            role: "chairperson",
+            department: profileData.department || "Administration",
+            position: "System Administrator",
+            responsibilities: ["User Management", "System Administration", "Oversight"]
+          };
+        }
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+        throw error;
       }
+    },
+    onError: (error) => {
+      console.error("Profile fetch error:", error);
+      toast.error(`Failed to load profile: ${error.message}`);
     }
-
-    // Default to current user's profile
-    return {
-      id: userRole === "counselor" ? "100" : "1",
-      name: userRole === "counselor" ? "Dr. Sarah Ahmed" : "Ahmad Ali",
-      email:
-        userRole === "counselor"
-          ? "sarah.ahmed@buitems.edu.pk"
-          : "ahmad.ali@student.buitems.edu.pk",
-      phone: userRole === "counselor" ? "+92 302 1234567" : "+92 300 1234567",
-      role: userRole,
-      studentId: userRole === "student" ? "CS-2024-001" : undefined,
-      department:
-        userRole === "student" ? "Computer Science" : "Psychology Department",
-      currentSemester: userRole === "student" ? "6th Semester" : undefined,
-      cgpa: userRole === "student" ? 3.85 : undefined,
-      enrollmentDate: userRole === "student" ? "September 2022" : undefined,
-      academicAdvisor: userRole === "student" ? "Dr. Sarah Ahmed" : undefined,
-      employeeId: userRole === "counselor" ? "EMP-2020-045" : undefined,
-      specialization:
-        userRole === "counselor"
-          ? ["Academic Counseling", "Career Guidance"]
-          : undefined,
-      officeLocation:
-        userRole === "counselor" ? "Room 201, Counseling Center" : undefined,
-      officeHours:
-        userRole === "counselor" ? "Mon-Fri: 9:00 AM - 5:00 PM" : undefined,
-      yearsOfExperience: userRole === "counselor" ? 8 : undefined,
-      address: "House 123, Street 45, Quetta, Balochistan",
-      emergencyContact: {
-        name: userRole === "counselor" ? "Dr. Ahmad Ahmed" : "Muhammad Ali",
-        phone: userRole === "counselor" ? "+92 302 9876543" : "+92 300 9876543",
-        relationship: userRole === "counselor" ? "Spouse" : "Father",
-      },
-      createdAt: "2022-09-01T00:00:00Z",
-      updatedAt: "2024-06-20T10:00:00Z",
-      lastLogin: "2024-06-20T14:30:00Z",
-    };
   });
 
-  const isViewingOtherProfile = id && userRole === "counselor";
+  // Update profile mutation
+  const updateProfileMutation = useMutation({
+    mutationFn: (updatedFields) => {
+      if (userRole === "student") {
+        return studentsService.updateStudent(userProfile.id, updatedFields);
+      } else if (userRole === "counselor") {
+        return counselorsService.updateCounselor(userProfile.id, updatedFields);
+      } else {
+        return usersService.updateUser(userProfile.id, updatedFields);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile', userProfile.id] });
+      toast.success("Profile updated successfully!");
+      setIsEditDialogOpen(false);
+    },
+    onError: (error) => {
+      toast.error(`Failed to update profile: ${error.message}`);
+    }
+  });
 
   const handleSaveProfile = async (updatedFields) => {
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      setUserProfile((prev) => ({
-        ...prev,
-        ...updatedFields,
-        updatedAt: new Date().toISOString(),
-      }));
-
-      toast.success("Profile updated successfully!");
+      updateProfileMutation.mutate(updatedFields);
     } catch (error) {
-      toast.error("Failed to update profile. Please try again.");
-      throw error;
+      console.error("Error updating profile:", error);
     }
   };
 
@@ -175,9 +163,62 @@ export default function ProfilePage() {
     }
   };
 
+  // Handle loading state
+  if (isLoadingProfile) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading profile data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle error state
+  if (profileError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Error Loading Profile</h2>
+          <p className="text-gray-600 mb-4">
+            {profileError.message || "Failed to load profile data. Please try again."}
+          </p>
+          <Button
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['profile', id || user?.id] })}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // If no profile data is available
+  if (!userProfile) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
+          <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Profile Not Found</h2>
+          <p className="text-gray-600 mb-4">
+            The requested profile could not be found or you don't have permission to view it.
+          </p>
+          <Button
+            onClick={() => window.history.back()}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            Go Back
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header userRole={userRole} />
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header Section */}
@@ -206,8 +247,10 @@ export default function ProfilePage() {
                   <h2 className="text-2xl font-bold">{userProfile.name}</h2>
                   <div className="flex items-center space-x-2 mt-1">
                     <Badge className={getRoleColor(userProfile.role)}>
-                      {userProfile.role.charAt(0).toUpperCase() +
-                        userProfile.role.slice(1)}
+                      {userProfile.role ?
+                        userProfile.role.charAt(0).toUpperCase() + userProfile.role.slice(1) :
+                        'Unknown'
+                      }
                     </Badge>
                     {userProfile.studentId && (
                       <span className="text-blue-100">
@@ -326,11 +369,11 @@ export default function ProfilePage() {
                       </div>
                     )}
 
-                    {userProfile.cgpa && (
+                    {userProfile.cgpa !== undefined && userProfile.cgpa !== null && (
                       <div>
                         <p className="text-sm text-gray-500">CGPA</p>
                         <p className="text-gray-900 font-semibold text-lg text-[#ffbc3b]">
-                          {userProfile.cgpa.toFixed(2)}
+                          {typeof userProfile.cgpa === 'number' ? userProfile.cgpa.toFixed(2) : userProfile.cgpa}
                         </p>
                       </div>
                     )}
@@ -350,7 +393,7 @@ export default function ProfilePage() {
 
                 {userProfile.role === "counselor" && (
                   <>
-                    {userProfile.specialization && (
+                    {userProfile.specialization && Array.isArray(userProfile.specialization) && (
                       <div>
                         <p className="text-sm text-gray-500">Specialization</p>
                         <div className="flex flex-wrap gap-2 mt-1">
@@ -380,6 +423,53 @@ export default function ProfilePage() {
                         </p>
                       </div>
                     )}
+
+                    {userProfile.yearsOfExperience && (
+                      <div>
+                        <p className="text-sm text-gray-500">Years of Experience</p>
+                        <p className="text-gray-900">
+                          {userProfile.yearsOfExperience} years
+                        </p>
+                      </div>
+                    )}
+
+                    {userProfile.currentStudentsCount !== undefined && (
+                      <div>
+                        <p className="text-sm text-gray-500">Student Capacity</p>
+                        <p className="text-gray-900">
+                          {userProfile.currentStudentsCount} / {userProfile.maxStudentsCapacity || 'N/A'}
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {userProfile.role === "chairperson" && (
+                  <>
+                    <div>
+                      <p className="text-sm text-gray-500">Position</p>
+                      <p className="text-gray-900">
+                        {userProfile.position || "System Administrator"}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-sm text-gray-500">Department</p>
+                      <p className="text-gray-900">
+                        {userProfile.department || "Administration"}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-sm text-gray-500">Responsibilities</p>
+                      <p className="text-gray-900">
+                        {userProfile.responsibilities ?
+                          (Array.isArray(userProfile.responsibilities) ?
+                            userProfile.responsibilities.join(", ") :
+                            userProfile.responsibilities) :
+                          "User Management, System Administration, Oversight"}
+                      </p>
+                    </div>
                   </>
                 )}
               </div>
@@ -387,7 +477,7 @@ export default function ProfilePage() {
           </Card>
 
           {/* Emergency Contact */}
-          {userProfile.emergencyContact && (
+          {(userProfile.emergencyContactName || userProfile.emergencyContactPhone || userProfile.emergencyContactRelationship) && (
             <Card>
               <CardContent className="p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
@@ -396,26 +486,32 @@ export default function ProfilePage() {
                 </h3>
 
                 <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-gray-500">Name</p>
-                    <p className="text-gray-900">
-                      {userProfile.emergencyContact.name}
-                    </p>
-                  </div>
+                  {userProfile.emergencyContactName && (
+                    <div>
+                      <p className="text-sm text-gray-500">Name</p>
+                      <p className="text-gray-900">
+                        {userProfile.emergencyContactName}
+                      </p>
+                    </div>
+                  )}
 
-                  <div>
-                    <p className="text-sm text-gray-500">Phone</p>
-                    <p className="text-gray-900">
-                      {userProfile.emergencyContact.phone}
-                    </p>
-                  </div>
+                  {userProfile.emergencyContactPhone && (
+                    <div>
+                      <p className="text-sm text-gray-500">Phone</p>
+                      <p className="text-gray-900">
+                        {userProfile.emergencyContactPhone}
+                      </p>
+                    </div>
+                  )}
 
-                  <div>
-                    <p className="text-sm text-gray-500">Relationship</p>
-                    <p className="text-gray-900">
-                      {userProfile.emergencyContact.relationship}
-                    </p>
-                  </div>
+                  {userProfile.emergencyContactRelationship && (
+                    <div>
+                      <p className="text-sm text-gray-500">Relationship</p>
+                      <p className="text-gray-900">
+                        {userProfile.emergencyContactRelationship}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

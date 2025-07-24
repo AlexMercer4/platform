@@ -1,167 +1,186 @@
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Plus, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import AppointmentCard from "@/components/appointments/AppointmentCard";
 import BookAppointmentDialog from "@/components/appointments/BookAppointmentDialog";
+import RescheduleAppointmentDialog from "@/components/appointments/RescheduleAppointmentDialog";
 import AppointmentFilters from "@/components/appointments/AppointmentFilters";
 import { useAuth } from "@/contexts/AuthContext";
+import { appointmentsService } from "@/services/appointments.service";
 
 export default function AppointmentsPage() {
   const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false);
+  const [isRescheduleDialogOpen, setIsRescheduleDialogOpen] = useState(false);
+  const [appointmentToReschedule, setAppointmentToReschedule] = useState(null);
   const [filters, setFilters] = useState({});
-  const [activeTab, setActiveTab] = useState("all");
   const { user } = useAuth();
   const userRole = user?.role;
 
-  // Mock appointments data - replace with actual API calls
-  const [appointments, setAppointments] = useState([
-    {
-      id: "1",
-      date: "2024-06-25",
-      time: "10:00 AM",
-      counselor: "Dr. Sarah Ahmed",
-      student: "Ahmad Ali",
-      location: "Room 201, Counseling Center",
-      status: "scheduled",
-      type: "counseling",
-      notes: "Follow-up session for academic planning",
-      createdAt: "2024-06-20T10:00:00Z",
-      updatedAt: "2024-06-20T10:00:00Z",
+  const queryClient = useQueryClient();
+  
+  // Fetch appointments using React Query
+  const { 
+    data: appointments = [], 
+    isLoading: isLoadingAppointments,
+    error: appointmentsError
+  } = useQuery({
+    queryKey: ['appointments', filters],
+    queryFn: () => appointmentsService.getAppointments(filters),
+    onError: (error) => {
+      toast.error(`Failed to load appointments: ${error.message}`);
+    }
+  });
+
+  // Create appointment mutation
+  const createAppointmentMutation = useMutation({
+    mutationFn: (appointmentData) => appointmentsService.createAppointment(appointmentData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      toast.success("Appointment booked successfully!");
+      setIsBookingDialogOpen(false);
     },
-    {
-      id: "2",
-      date: "2024-06-28",
-      time: "2:00 PM",
-      counselor: "Prof. Ahmad Hassan",
-      student: "Ahmad Ali",
-      location: "Room 105, Student Services",
-      status: "pending",
-      type: "academic",
-      notes: "Course selection guidance",
-      createdAt: "2024-06-21T14:00:00Z",
-      updatedAt: "2024-06-21T14:00:00Z",
+    onError: (error) => {
+      toast.error(`Failed to book appointment: ${error.message}`);
+    }
+  });
+
+  // Update appointment status mutation (for completing, cancelling, and confirming appointments)
+  const updateAppointmentStatusMutation = useMutation({
+    mutationFn: ({ appointmentId, status }) => 
+      appointmentsService.updateAppointmentStatus(appointmentId, status),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      let statusMessage = "Appointment status updated successfully";
+      
+      switch (variables.status) {
+        case "CANCELLED":
+          statusMessage = "Appointment cancelled successfully";
+          break;
+        case "COMPLETED":
+          statusMessage = "Appointment marked as completed";
+          break;
+        case "SCHEDULED":
+          statusMessage = "Appointment confirmed successfully";
+          break;
+        default:
+          statusMessage = "Appointment status updated successfully";
+      }
+      
+      toast.success(statusMessage);
     },
-    {
-      id: "3",
-      date: "2024-06-20",
-      time: "11:00 AM",
-      counselor: "Dr. Fatima Sheikh",
-      student: "Ahmad Ali",
-      location: "Room 303, Academic Block",
-      status: "completed",
-      type: "career",
-      notes: "Career path discussion",
-      createdAt: "2024-06-15T11:00:00Z",
-      updatedAt: "2024-06-20T11:30:00Z",
+    onError: (error) => {
+      toast.error(`Failed to update appointment status: ${error.message}`);
+    }
+  });
+
+  // Update appointment mutation (for rescheduling)
+  const updateAppointmentMutation = useMutation({
+    mutationFn: ({ appointmentId, appointmentData }) => 
+      appointmentsService.updateAppointment(appointmentId, appointmentData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      toast.success("Appointment rescheduled successfully!");
     },
-    {
-      id: "4",
-      date: "2024-06-15",
-      time: "3:00 PM",
-      counselor: "Prof. Ali Khan",
-      student: "Ahmad Ali",
-      location: "Room 202, Counseling Center",
-      status: "cancelled",
-      type: "personal",
-      notes: "Personal development session",
-      createdAt: "2024-06-10T15:00:00Z",
-      updatedAt: "2024-06-14T10:00:00Z",
-    },
-  ]);
+    onError: (error) => {
+      toast.error(`Failed to reschedule appointment: ${error.message}`);
+    }
+  });
 
   const handleBookAppointment = async (appointmentData) => {
     try {
-      // Simulate API call
-      const newAppointment = {
-        id: Date.now().toString(),
-        ...appointmentData,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      setAppointments((prev) => [newAppointment, ...prev]);
-      toast.success("Appointment booked successfully!");
+      createAppointmentMutation.mutate(appointmentData);
     } catch (error) {
-      console.log(error);
-
-      toast.error("Failed to book appointment. Please try again.");
+      console.error("Error booking appointment:", error);
     }
   };
 
   const handleReschedule = (appointment) => {
-    console.log(appointment);
-    // Open reschedule dialog (similar to booking dialog)
-    toast.info("Reschedule functionality would open here");
+    setAppointmentToReschedule(appointment);
+    setIsRescheduleDialogOpen(true);
+  };
+  
+  const handleRescheduleSubmit = (updatedAppointment) => {
+    try {
+      updateAppointmentMutation.mutate({
+        appointmentId: updatedAppointment.id,
+        appointmentData: updatedAppointment
+      });
+      setIsRescheduleDialogOpen(false);
+      setAppointmentToReschedule(null);
+    } catch (error) {
+      console.error("Error rescheduling appointment:", error);
+    }
   };
 
   const handleCancel = (appointment) => {
-    setAppointments((prev) =>
-      prev.map((apt) =>
-        apt.id === appointment.id
-          ? { ...apt, status: "cancelled", updatedAt: new Date().toISOString() }
-          : apt
-      )
-    );
-    toast.success("Appointment cancelled successfully");
+    try {
+      updateAppointmentStatusMutation.mutate({ 
+        appointmentId: appointment.id, 
+        status: "CANCELLED" 
+      });
+    } catch (error) {
+      console.error("Error cancelling appointment:", error);
+    }
   };
 
   const handleComplete = (appointment) => {
-    setAppointments((prev) =>
-      prev.map((apt) =>
-        apt.id === appointment.id
-          ? { ...apt, status: "completed", updatedAt: new Date().toISOString() }
-          : apt
-      )
-    );
-    toast.success("Appointment marked as completed");
+    try {
+      updateAppointmentStatusMutation.mutate({ 
+        appointmentId: appointment.id, 
+        status: "COMPLETED" 
+      });
+    } catch (error) {
+      console.error("Error completing appointment:", error);
+    }
   };
 
-  const filterAppointments = (appointments, tab) => {
-    let filtered = appointments;
-
-    // Filter by tab
-    if (tab === "upcoming") {
-      filtered = filtered.filter(
-        (apt) => apt.status === "scheduled" || apt.status === "pending"
-      );
-    } else if (tab === "past") {
-      filtered = filtered.filter(
-        (apt) => apt.status === "completed" || apt.status === "cancelled"
-      );
+  const handleConfirm = (appointment) => {
+    try {
+      updateAppointmentStatusMutation.mutate({ 
+        appointmentId: appointment.id, 
+        status: "SCHEDULED" 
+      });
+    } catch (error) {
+      console.error("Error confirming appointment:", error);
     }
-
-    // Apply additional filters
-    if (filters.status) {
-      filtered = filtered.filter((apt) => apt.status === filters.status);
-    }
-    if (filters.type) {
-      filtered = filtered.filter((apt) => apt.type === filters.type);
-    }
-    if (filters.counselor) {
-      filtered = filtered.filter((apt) =>
-        apt.counselor.includes(filters.counselor)
-      );
-    }
-    if (filters.dateRange) {
-      const { start, end } = filters.dateRange;
-      if (start) {
-        filtered = filtered.filter((apt) => apt.date >= start);
-      }
-      if (end) {
-        filtered = filtered.filter((apt) => apt.date <= end);
-      }
-    }
-
-    return filtered;
   };
-
-  const upcomingAppointments = filterAppointments(appointments, "upcoming");
-  const pastAppointments = filterAppointments(appointments, "past");
-  const allAppointments = filterAppointments(appointments, "all");
 
   const canBookAppointment = userRole === "student" || userRole === "counselor";
+
+  // Handle loading state
+  if (isLoadingAppointments) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading appointments...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle error state
+  if (appointmentsError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Error Loading Appointments</h2>
+          <p className="text-gray-600 mb-4">
+            {appointmentsError.message || "Failed to load appointments. Please try again."}
+          </p>
+          <Button 
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['appointments'] })}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -195,119 +214,43 @@ export default function AppointmentsPage() {
           />
         </div>
 
-        {/* Tabs */}
-        <Tabs
-          value={activeTab}
-          onValueChange={setActiveTab}
-          className="space-y-6"
-        >
-          <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:grid-cols-3">
-            <TabsTrigger value="upcoming">Upcoming Appointments</TabsTrigger>
-            <TabsTrigger value="past">Past Appointments</TabsTrigger>
-            <TabsTrigger value="all">All Appointments</TabsTrigger>
-          </TabsList>
+        {/* Appointments List */}
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Appointments ({appointments.length})
+            </h2>
+          </div>
 
-          <TabsContent value="upcoming" className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Upcoming Appointments ({upcomingAppointments.length})
-              </h2>
+          {appointments.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500 text-lg">No appointments found.</p>
+              {canBookAppointment && (
+                <Button
+                  onClick={() => setIsBookingDialogOpen(true)}
+                  className="mt-4 bg-[#0056b3] hover:bg-[#004494]"
+                >
+                  Book Your First Appointment
+                </Button>
+              )}
             </div>
-
-            {upcomingAppointments.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-gray-500 text-lg">
-                  No upcoming appointments found.
-                </p>
-                {canBookAppointment && (
-                  <Button
-                    onClick={() => setIsBookingDialogOpen(true)}
-                    className="mt-4 bg-[#0056b3] hover:bg-[#004494]"
-                  >
-                    Book Your First Appointment
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {upcomingAppointments.map((appointment) => (
-                  <AppointmentCard
-                    key={appointment.id}
-                    appointment={appointment}
-                    userRole={userRole}
-                    onReschedule={handleReschedule}
-                    onCancel={handleCancel}
-                    onComplete={handleComplete}
-                  />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="past" className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Past Appointments ({pastAppointments.length})
-              </h2>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {appointments.map((appointment) => (
+                <AppointmentCard
+                  key={appointment.id}
+                  appointment={appointment}
+                  userRole={userRole}
+                  currentUserId={user?.id}
+                  onReschedule={handleReschedule}
+                  onCancel={handleCancel}
+                  onComplete={handleComplete}
+                  onConfirm={handleConfirm}
+                />
+              ))}
             </div>
-
-            {pastAppointments.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-gray-500 text-lg">
-                  No past appointments found.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {pastAppointments.map((appointment) => (
-                  <AppointmentCard
-                    key={appointment.id}
-                    appointment={appointment}
-                    userRole={userRole}
-                    onReschedule={handleReschedule}
-                    onCancel={handleCancel}
-                    onComplete={handleComplete}
-                  />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="all" className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900">
-                All Appointments ({allAppointments.length})
-              </h2>
-            </div>
-
-            {allAppointments.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-gray-500 text-lg">No appointments found.</p>
-                {canBookAppointment && (
-                  <Button
-                    onClick={() => setIsBookingDialogOpen(true)}
-                    className="mt-4 bg-[#0056b3] hover:bg-[#004494]"
-                  >
-                    Book Your First Appointment
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {allAppointments.map((appointment) => (
-                  <AppointmentCard
-                    key={appointment.id}
-                    appointment={appointment}
-                    userRole={userRole}
-                    onReschedule={handleReschedule}
-                    onCancel={handleCancel}
-                    onComplete={handleComplete}
-                  />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+          )}
+        </div>
 
         {/* Book Appointment Dialog */}
         <BookAppointmentDialog
@@ -315,6 +258,14 @@ export default function AppointmentsPage() {
           onOpenChange={setIsBookingDialogOpen}
           userRole={userRole}
           onSubmit={handleBookAppointment}
+        />
+
+        {/* Reschedule Appointment Dialog */}
+        <RescheduleAppointmentDialog
+          open={isRescheduleDialogOpen}
+          onOpenChange={setIsRescheduleDialogOpen}
+          appointment={appointmentToReschedule}
+          onSubmit={handleRescheduleSubmit}
         />
       </main>
     </div>

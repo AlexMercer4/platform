@@ -12,24 +12,44 @@ export const protect = (roles = []) => {
       if (!token) {
         return res
           .status(401)
-          .json({ message: "No token, authorization denied" });
+          .json({ 
+            success: false,
+            message: "No token, authorization denied" 
+          });
       }
 
       // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      // Check if user still exists
+      // Check if user still exists and is active
       const user = await prisma.user.findUnique({
         where: { id: decoded.id },
+        include: {
+          student: true,
+          counselor: true,
+        },
       });
 
       if (!user) {
-        return res.status(401).json({ message: "User not found" });
+        return res.status(401).json({ 
+          success: false,
+          message: "User not found" 
+        });
+      }
+
+      if (!user.isActive) {
+        return res.status(401).json({ 
+          success: false,
+          message: "Account has been deactivated" 
+        });
       }
 
       // Check if user role is allowed (if roles are specified)
       if (roles.length > 0 && !roles.includes(user.role)) {
-        return res.status(403).json({ message: "Access denied" });
+        return res.status(403).json({ 
+          success: false,
+          message: "Access denied - insufficient permissions" 
+        });
       }
 
       // Attach user and token to request
@@ -40,7 +60,24 @@ export const protect = (roles = []) => {
     } catch (err) {
       console.error("Authentication error:", err);
 
-      res.status(500).json({ message: "Server error during authentication" });
+      if (err.name === "JsonWebTokenError") {
+        return res.status(401).json({ 
+          success: false,
+          message: "Invalid token" 
+        });
+      }
+
+      if (err.name === "TokenExpiredError") {
+        return res.status(401).json({ 
+          success: false,
+          message: "Token expired" 
+        });
+      }
+
+      res.status(500).json({ 
+        success: false,
+        message: "Server error during authentication" 
+      });
     }
   };
 };

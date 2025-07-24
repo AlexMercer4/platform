@@ -9,3 +9,4 @@ export { notesService } from './notes.service';
 export { dashboardService } from './dashboard.service';
 export { analyticsService } from './analytics.service';
 export { uploadService } from './upload.service';
+export { notificationService } from './notifications.service';

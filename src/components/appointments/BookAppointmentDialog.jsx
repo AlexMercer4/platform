@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Calendar, Clock, User, MapPin, FileText } from "lucide-react";
 import {
   Dialog,
@@ -16,8 +17,12 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
+  SelectValue
 } from "@/components/ui/select";
+import { toast } from "sonner";
+import { counselorsService } from "@/services/counselors.service";
+import { studentsService } from "@/services/students.service";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function BookAppointmentDialog({
   open,
@@ -33,52 +38,35 @@ export default function BookAppointmentDialog({
   const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const { user } = useAuth()
 
-  // Mock data - replace with actual API calls
-  const counselors = [
-    {
-      id: "1",
-      name: "Dr. Sarah Ahmed",
-      email: "sarah@university.edu",
-      role: "counselor",
-      department: "Psychology",
-    },
-    {
-      id: "2",
-      name: "Prof. Ahmad Hassan",
-      email: "ahmad@university.edu",
-      role: "counselor",
-      department: "Academic Affairs",
-    },
-    {
-      id: "3",
-      name: "Dr. Fatima Sheikh",
-      email: "fatima@university.edu",
-      role: "counselor",
-      department: "Career Services",
-    },
-  ];
+  // Fetch assigned counselor for students using React Query
+  const {
+    data: counselors = [],
+    isLoading: isLoadingCounselors,
+    error: counselorsError
+  } = useQuery({
+    queryKey: ['assigned-counselor'],
+    queryFn: () => counselorsService.getAssignedCounselor(),
+    enabled: open && userRole === "student",
+    onError: (error) => {
+      toast.error(`Failed to load assigned counselor: ${error.message}`);
+    }
+  });
 
-  const students = [
-    {
-      id: "1",
-      name: "Ahmad Ali",
-      email: "ahmad.ali@student.edu",
-      role: "student",
-    },
-    {
-      id: "2",
-      name: "Fatima Khan",
-      email: "fatima.khan@student.edu",
-      role: "student",
-    },
-    {
-      id: "3",
-      name: "Hassan Ahmed",
-      email: "hassan.ahmed@student.edu",
-      role: "student",
-    },
-  ];
+  // Fetch students using React Query (counselors get their assigned students)
+  const {
+    data: students = [],
+    isLoading: isLoadingStudents,
+    error: studentsError
+  } = useQuery({
+    queryKey: ['assigned-students'],
+    queryFn: () => studentsService.getAssignedStudents(),
+    enabled: open && userRole === "counselor",
+    onError: (error) => {
+      toast.error(`Failed to load assigned students: ${error.message}`);
+    }
+  });
 
   const timeSlots = [
     { time: "09:00 AM", available: true },
@@ -108,16 +96,24 @@ export default function BookAppointmentDialog({
     e.preventDefault();
     setIsLoading(true);
 
+    // Prepare appointment data for API
     const appointmentData = {
       date: selectedDate,
       time: selectedTime,
-      counselor: userRole === "student" ? selectedCounselor : "current-user",
-      student: userRole === "counselor" ? selectedStudent : "current-user",
-      type: appointmentType,
+      type: appointmentType.toUpperCase(), // Backend expects uppercase enum values
       location,
       notes,
-      status: userRole === "student" ? "pending" : "scheduled",
     };
+
+    // console.log(currentUserId)
+    // Set the appropriate IDs based on user role
+    if (userRole === "student") {
+      appointmentData.studentId = user.id;
+      appointmentData.counselorId = selectedCounselor;
+    } else if (userRole === "counselor") {
+      appointmentData.counselorId = user.id;
+      appointmentData.studentId = selectedStudent;
+    }
 
     try {
       await onSubmit(appointmentData);
@@ -210,16 +206,36 @@ export default function BookAppointmentDialog({
               <Select
                 value={selectedCounselor}
                 onValueChange={setSelectedCounselor}
+                disabled={isLoadingCounselors}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select counselor" />
+                  <SelectValue
+                    placeholder={
+                      isLoadingCounselors
+                        ? "Loading assigned counselor..."
+                        : counselorsError
+                          ? "Error loading assigned counselor"
+                          : "Select counselor"
+                    }
+                  />
                 </SelectTrigger>
+                {/* For the counselor select */}
                 <SelectContent>
-                  {counselors.map((counselor) => (
-                    <SelectItem key={counselor.id} value={counselor.id}>
-                      {counselor.name} - {counselor.department}
+                  {counselorsError ? (
+                    <SelectItem value="error" disabled>
+                      Failed to load assigned counselor. Please try again.
                     </SelectItem>
-                  ))}
+                  ) : !counselors || !counselors.data || counselors.data.length === 0 ? (
+                    <SelectItem value="no-counselors" disabled>
+                      No assigned counselor found. Please contact admin.
+                    </SelectItem>
+                  ) : (
+                    counselors.data.map((counselor) => (
+                      <SelectItem key={counselor.id} value={counselor.id}>
+                        {counselor.name} - {counselor.department}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -232,16 +248,36 @@ export default function BookAppointmentDialog({
               <Select
                 value={selectedStudent}
                 onValueChange={setSelectedStudent}
+                disabled={isLoadingStudents}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select student" />
+                  <SelectValue
+                    placeholder={
+                      isLoadingStudents
+                        ? "Loading students..."
+                        : studentsError
+                          ? "Error loading students"
+                          : "Select student"
+                    }
+                  />
                 </SelectTrigger>
+                {/* For the student select */}
                 <SelectContent>
-                  {students.map((student) => (
-                    <SelectItem key={student.id} value={student.id}>
-                      {student.name}
+                  {studentsError ? (
+                    <SelectItem value="error" disabled>
+                      Failed to load assigned students. Please try again.
                     </SelectItem>
-                  ))}
+                  ) : !students || !students.data || students.data.length === 0 ? (
+                    <SelectItem value="no-students" disabled>
+                      No assigned students found. Please contact admin to assign students.
+                    </SelectItem>
+                  ) : (
+                    students.data.map((student) => (
+                      <SelectItem key={student.id} value={student.id}>
+                        {student.name} - {student.studentId} ({student.department})
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>

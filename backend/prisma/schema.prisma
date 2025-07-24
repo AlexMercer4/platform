@@ -8,21 +8,44 @@ datasource db {
 }
 
 model User {
-  id         String  @id @default(cuid())
-  name       String
-  email      String  @unique
-  password   String
-  role       Role
-  department String
-  studentId  String?
-  employeeId String?
+  id        String    @id @default(cuid())
+  name      String
+  email     String    @unique
+  password  String
+  phone     String?
+  role      Role
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  lastLogin DateTime?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  // Profile relations
+  student   Student?
+  counselor Counselor?
 
-  StudentAppointments   Appointment[]  @relation("StudentAppointments")
-  CounselorAppointments Appointment[]  @relation("CounselorAppointments")
-  Availability          Availability[]
+  // Appointment relations
+  studentAppointments   Appointment[] @relation("StudentAppointments")
+  counselorAppointments Appointment[] @relation("CounselorAppointments")
+
+  // Message relations
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+
+  // Conversation relations
+  conversations1 Conversation[] @relation("Participant1")
+  conversations2 Conversation[] @relation("Participant2")
+
+  // Notes relations
+  counselorNotes StudentNote[] @relation("CounselorNotes")
+
+  // File uploads
+  uploadedFiles Attachment[]
+
+  // Counselor assignments
+  assignedStudents Student[] @relation("AssignedStudents")
+  
+  // Notifications
+  notifications Notification[]
 }
 
 enum Role {
@@ -31,53 +54,170 @@ enum Role {
   CHAIRPERSON
 }
 
+model Student {
+  id                           String    @id @default(cuid())
+  userId                       String    @unique
+  studentId                    String    @unique // CMS ID like "CS-2024-001"
+  department                   String
+  batch                        String // e.g., "Fall 2021"
+  currentSemester              String // e.g., "6th Semester"
+  cgpa                         Float?    @default(0)
+  enrollmentDate               DateTime
+  address                      String?
+  assignedCounselorId          String?
+  emergencyContactName         String?
+  emergencyContactPhone        String?
+  emergencyContactRelationship String?
+  totalSessions                Int       @default(0)
+  lastSessionDate              DateTime?
+
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedCounselor User?         @relation("AssignedStudents", fields: [assignedCounselorId], references: [id])
+  notes             StudentNote[] @relation("StudentNotes")
+}
+
+model Counselor {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  employeeId           String   @unique
+  department           String
+  specialization       String[] // JSON array
+  officeLocation       String?
+  officeHours          String?
+  yearsOfExperience    Int?
+  maxStudentsCapacity  Int      @default(40)
+  currentStudentsCount Int      @default(0)
+  address              String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 model Appointment {
-  id String @id @default(uuid())
+  id          String            @id @default(cuid())
+  studentId   String
+  counselorId String
+  date        DateTime
+  time        String
+  duration    Int               @default(60) // minutes
+  location    String?
+  status      AppointmentStatus @default(PENDING)
+  type        AppointmentType
+  notes       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 
-  date      DateTime
-  startTime String
-  endTime   String
-  duration  Int
-  location  String?
-  type      String
-  status    AppointmentStatus @default(PENDING)
-  notes     String?
-
-  studentId   String?
-  counselorId String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  student   User? @relation("StudentAppointments", fields: [studentId], references: [id])
-  counselor User? @relation("CounselorAppointments", fields: [counselorId], references: [id])
+  student   User @relation("StudentAppointments", fields: [studentId], references: [id])
+  counselor User @relation("CounselorAppointments", fields: [counselorId], references: [id])
 }
 
 enum AppointmentStatus {
+  SCHEDULED
   PENDING
-  CONFIRMED
-  CANCELLED
   COMPLETED
+  CANCELLED
 }
 
-model Availability {
-  id        String    @id @default(uuid())
-  userId    String
-  user      User      @relation(fields: [userId], references: [id])
-  dayOfWeek DayOfWeek
-  startTime String
-  endTime   String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum AppointmentType {
+  COUNSELING
+  ACADEMIC
+  CAREER
+  PERSONAL
 }
 
-enum DayOfWeek {
-  MONDAY
-  TUESDAY
-  WEDNESDAY
-  THURSDAY
-  FRIDAY
-  SATURDAY
-  SUNDAY
+model Conversation {
+  id             String   @id @default(cuid())
+  participant1Id String
+  participant2Id String
+  lastMessageId  String?  @unique
+  unreadCount    Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  participant1  User         @relation("Participant1", fields: [participant1Id], references: [id])
+  participant2  User         @relation("Participant2", fields: [participant2Id], references: [id])
+  messages      Message[]
+  lastMessage   Message?     @relation("LastMessage", fields: [lastMessageId], references: [id])
+  attachments   Attachment[]
+
+  @@unique([participant1Id, participant2Id])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  senderId       String
+  receiverId     String
+  content        String
+  attachmentId   String?
+  isRead         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User          @relation("SentMessages", fields: [senderId], references: [id])
+  receiver       User          @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  attachment     Attachment?   @relation(fields: [attachmentId], references: [id])
+  lastMessageFor Conversation? @relation("LastMessage")
+}
+
+model StudentNote {
+  id          String       @id @default(cuid())
+  studentId   String
+  counselorId String
+  category    NoteCategory
+  content     String
+  isPrivate   Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  student   Student @relation("StudentNotes", fields: [studentId], references: [id])
+  counselor User    @relation("CounselorNotes", fields: [counselorId], references: [id])
+}
+
+enum NoteCategory {
+  ACADEMIC
+  BEHAVIORAL
+  CAREER
+  PERSONAL
+  ATTENDANCE
+  GENERAL
+}
+
+model Attachment {
+  id             String   @id @default(cuid())
+  filename       String
+  originalName   String
+  mimeType       String
+  size           Int
+  url            String
+  uploadedById   String
+  conversationId String?
+  createdAt      DateTime @default(now())
+
+  uploadedBy   User          @relation(fields: [uploadedById], references: [id])
+  conversation Conversation? @relation(fields: [conversationId], references: [id])
+  messages     Message[]
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String           // User who will receive the notification
+  type        NotificationType
+  title       String
+  message     String
+  isRead      Boolean          @default(false)
+  relatedId   String?          // ID of related entity (appointment, message, etc.)
+  relatedType String?          // Type of related entity (appointment, message, etc.)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum NotificationType {
+  MESSAGE
+  APPOINTMENT_CREATED
+  APPOINTMENT_UPDATED
+  APPOINTMENT_CANCELLED
+  APPOINTMENT_REMINDER
 }

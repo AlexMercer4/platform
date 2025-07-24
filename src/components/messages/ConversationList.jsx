@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import ConversationItem from "./ConversationItem";
@@ -12,17 +12,26 @@ export default function ConversationList({
   currentUserId,
   userRole,
   onStartConversation,
+  isLoading
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isStartConversationOpen, setIsStartConversationOpen] = useState(false);
 
+  // Filter conversations based on search query
   const filteredConversations = conversations.filter((conversation) => {
-    const otherParticipant = conversation.participants.find(
-      (p) => p.id !== currentUserId
-    );
-    return otherParticipant?.name
+    if (!conversation.otherUser) return false;
+    
+    return conversation.otherUser.name
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
+  });
+
+  // Sort conversations by most recent activity
+  const sortedConversations = [...filteredConversations].sort((a, b) => {
+    // If a conversation has a last message, use its timestamp for sorting
+    const aTime = a.lastMessage ? new Date(a.lastMessage.createdAt).getTime() : new Date(a.updatedAt).getTime();
+    const bTime = b.lastMessage ? new Date(b.lastMessage.createdAt).getTime() : new Date(b.updatedAt).getTime();
+    return bTime - aTime; // Sort in descending order (newest first)
   });
 
   const canStartConversation =
@@ -37,11 +46,11 @@ export default function ConversationList({
   };
 
   return (
-    <div className="w-full lg:w-80 bg-white border-r border-gray-200 flex flex-col h-full">
+    <div className="w-full h-full bg-white border-r border-gray-200 flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Conversations</h2>
+      <div className="p-3 md:p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between mb-3 md:mb-4">
+          <h2 className="text-base md:text-lg font-semibold text-gray-900">Conversations</h2>
           {canStartConversation && (
             <Button
               size="sm"
@@ -67,7 +76,12 @@ export default function ConversationList({
 
       {/* Conversations List */}
       <div className="flex-1 overflow-y-auto">
-        {filteredConversations.length === 0 ? (
+        {isLoading ? (
+          <div className="p-4 text-center text-gray-500">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-[#0056b3]" />
+            <p>Loading conversations...</p>
+          </div>
+        ) : sortedConversations.length === 0 ? (
           <div className="p-4 text-center text-gray-500">
             {searchQuery ? "No conversations found" : "No conversations yet"}
             {canStartConversation && !searchQuery && (
@@ -84,7 +98,7 @@ export default function ConversationList({
             )}
           </div>
         ) : (
-          filteredConversations.map((conversation) => (
+          sortedConversations.map((conversation) => (
             <ConversationItem
               key={conversation.id}
               conversation={conversation}
